@@ -1,3 +1,4 @@
+import os
 import gym
 import cv2
 import numpy as np
@@ -65,7 +66,9 @@ class OffRoadNavEnv(gym.Env):
         self.highlight = False
 
     def load_rewards(self):
-        reward_fn = "data/{}.mat".format(self.opts.track)
+
+        reward_dir = os.path.dirname(os.path.realpath(__file__)) + "/../../data"
+        reward_fn = "{}/{}.mat".format(reward_dir, self.opts.track)
         rewards = scipy.io.loadmat(reward_fn)["reward"].astype(np.float32)
         # rewards -= 100
         # rewards -= 15

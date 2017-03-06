@@ -1,6 +1,11 @@
 import cv2
 import numpy as np
 
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(AttrDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self
+
 def to_image(R, K, interpolation=cv2.INTER_NEAREST):
     R = normalize(R)
     R = cv2.resize(R, (R.shape[1] * K, R.shape[0] * K), interpolation=interpolation)[..., None]
@@ -13,3 +18,27 @@ def normalize(x):
         x = (x - np.min(x)) / value_range * 255.
     x = np.clip(x, 0, 255).astype(np.uint8)
     return x
+
+def get_options_from_tensorflow_flags():
+    import tensorflow as tf
+    FLAGS = tf.flags.FLAGS
+
+    options = AttrDict({
+        'field_of_view': 20,
+        'min_mu_vf':  6. / 3.6,
+        'max_mu_vf': 14. / 3.6,
+        'min_mu_steer': -30 * np.pi / 180,
+        'max_mu_steer': +30 * np.pi / 180,
+        'timestep': 0.0025,
+        'vehicle_model_noise_level': 0.02,
+        'wheelbase': 2.0,
+        'track': 'big_track',
+        'command_freq': 5,
+        'n_agents_per_worker': 1,
+        'drift': False
+    })
+
+    for key in options.keys():
+        options[key] = getattr(FLAGS, key, options[key])
+
+    return options

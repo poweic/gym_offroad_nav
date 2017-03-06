@@ -2,16 +2,14 @@ import gym
 import cv2
 import numpy as np
 import scipy.io
-import tensorflow as tf
 from gym import error, spaces, utils
 from gym.utils import seeding
 from time import time
 
-from gym_offroad_nav.utils import to_image
+from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
 
-FLAGS = tf.flags.FLAGS
 RAD2DEG = 180. / np.pi
 
 class OffRoadNavEnv(gym.Env):
@@ -21,12 +19,14 @@ class OffRoadNavEnv(gym.Env):
     }
 
     def __init__(self):
+
+        self.opts = get_options_from_tensorflow_flags()
         self.viewer = None
 
-        self.fov = FLAGS.field_of_view
+        self.fov = self.opts.field_of_view
 
         # action space = forward velocity + steering angle
-        self.action_space = spaces.Box(low=np.array([FLAGS.min_mu_vf, FLAGS.min_mu_steer]), high=np.array([FLAGS.max_mu_vf, FLAGS.max_mu_steer]))
+        self.action_space = spaces.Box(low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]), high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer]))
 
         # Observation space = front view (image) + vehicle state (6-dim vector)
         float_min = np.finfo(np.float32).min
@@ -36,7 +36,7 @@ class OffRoadNavEnv(gym.Env):
             spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
 
-        # A tf.tensor (or np) containing rewards, we need a constant version and 
+        # A matrix containing rewards, we need a constant version and 
         self.rewards = self.load_rewards()
         self.height, self.width = self.rewards.shape
         self.cx, self.cy = 0, self.height / 2
@@ -50,10 +50,11 @@ class OffRoadNavEnv(gym.Env):
         
         self.cell_size = 0.5
 
+        # self.vehicle_model_gpu = VehicleModelGPU(...)
         self.vehicle_model = VehicleModel(
-            FLAGS.timestep, FLAGS.vehicle_model_noise_level, FLAGS.wheelbase
+            self.opts.timestep, self.opts.vehicle_model_noise_level,
+            self.opts.wheelbase, self.opts.drift
         )
-        # self.vehicle_model_gpu = VehicleModelGPU(FLAGS.timestep, FLAGS.vehicle_model_noise_level)
 
         self.K = 10
 
@@ -64,7 +65,7 @@ class OffRoadNavEnv(gym.Env):
         self.highlight = False
 
     def load_rewards(self):
-        reward_fn = "data/{}.mat".format(FLAGS.track)
+        reward_fn = "data/{}.mat".format(self.opts.track)
         rewards = scipy.io.loadmat(reward_fn)["reward"].astype(np.float32)
         # rewards -= 100
         # rewards -= 15
@@ -127,7 +128,7 @@ class OffRoadNavEnv(gym.Env):
         Tuple
             A 4-element tuple (state, reward, done, info)
         '''
-        n_sub_steps = int(1. / FLAGS.command_freq / FLAGS.timestep)
+        n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
         for j in range(n_sub_steps):
             self.state = self.vehicle_model.predict(self.state, action)
 
@@ -196,7 +197,7 @@ class OffRoadNavEnv(gym.Env):
         state = state.astype(np.float32).reshape(6, -1)
 
         # Add some noise to have diverse start points
-        noise = np.random.randn(6, FLAGS.n_agents_per_worker).astype(np.float32) * 0.5
+        noise = np.random.randn(6, self.opts.n_agents_per_worker).astype(np.float32) * 0.5
         noise[2, :] /= 2
 
         state = state + noise
@@ -205,19 +206,14 @@ class OffRoadNavEnv(gym.Env):
 
     def _reset(self):
         if not hasattr(self, "padded_rewards"):
-            FOV = FLAGS.field_of_view
-            shape = (np.array(self.rewards.shape) + [FOV * 2, FOV * 2]).tolist()
+            fov = self.fov
+            shape = (np.array(self.rewards.shape) + [fov * 2, fov * 2]).tolist()
             fill = np.min(self.rewards)
             self.padded_rewards = np.full(shape, fill, dtype=np.float32)
-            self.padded_rewards[FOV:-FOV, FOV:-FOV] = self.rewards
-
-        """
-        if not hasattr(self, "R"):
-            self.R = to_image(self.rewards, self.K)
-        """
+            self.padded_rewards[fov:-fov, fov:-fov] = self.rewards
 
         if not hasattr(self, "bR"):
-            self.bR = to_image(self.debug_bilinear_R(), 1) # self.K)
+            self.bR = to_image(self.debug_bilinear_R(), 1)
 
         self.disp_img = np.copy(self.bR)
 
@@ -250,7 +246,7 @@ class OffRoadNavEnv(gym.Env):
         iix = np.clip(ix - self.x_min, 0, self.width - 1)
         iiy = np.clip(self.y_max - 1 - iy, 0, self.height - 1)
 
-        fov = FLAGS.field_of_view
+        fov = self.fov
 
         cxs, cys = iix + fov, iiy + fov
 

@@ -143,13 +143,15 @@ class OffRoadNavEnv(gym.Env):
 
         reward = self._bilinear_reward_lookup(x, y)
 
+        # reward -= np.sum(action ** 2, axis=0) * 0.1
+
         # debug info
         info = {}
 
         self.prev_action = action.copy()
 
         # FIXME is this the correct way?
-        done = np.any(done)
+        # done = np.any(done)
 
         return self.state.copy(), reward, done, info
 

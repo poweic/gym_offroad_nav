@@ -18,6 +18,8 @@ class VehicleModel():
         self.timestep = timestep
         self.noise_level = noise_level
         self.wheelbase = wheelbase
+        self.drift = drift
+        self.rng = np.random.RandomState()
 
         if not drift:
             self.A[0][0] = 0
@@ -38,6 +40,9 @@ class VehicleModel():
         # x' = Ax + Bu (prediction)
         # y' = Cx + Du (measurement)
         self.x = None
+
+    def seed(self, rng):
+        self.rng = rng
 
     def _predict(self, x, u):
         u = u.reshape(2, -1)
@@ -85,7 +90,8 @@ class VehicleModel():
         delta = V * self.timestep
 
         # Add some noise using delta * (1 + noise) instead of delta + noise
-        delta *= 1 + np.random.rand(*delta.shape) * self.noise_level
+        noise = self.rng.rand(*delta.shape) * self.noise_level
+        delta *= 1 + noise
 
         # x2 = x1 + dx
         state[0:3] += delta

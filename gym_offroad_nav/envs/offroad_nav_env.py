@@ -65,6 +65,8 @@ class OffRoadNavEnv(gym.Env):
 
         self.highlight = False
 
+        self.rng = np.random.RandomState()
+
     def load_rewards(self):
 
         reward_dir = os.path.dirname(os.path.realpath(__file__)) + "/../../data"
@@ -81,8 +83,10 @@ class OffRoadNavEnv(gym.Env):
 
         return rewards
 
-    def set_worker(self, worker):
-        self.worker = worker
+    def _seed(self, seed=None):
+        self.rng, seed = seeding.np_random(seed)
+        self.vehicle_model.seed(self.rng)
+        return seed
 
     def _step_2(self, action, N):
         ''' Take one step in the environment
@@ -202,7 +206,7 @@ class OffRoadNavEnv(gym.Env):
         state = state.astype(np.float32).reshape(6, -1)
 
         # Add some noise to have diverse start points
-        noise = np.random.randn(6, self.opts.n_agents_per_worker).astype(np.float32) * 0.5
+        noise = self.rng.randn(6, self.opts.n_agents_per_worker).astype(np.float32) * 0.5
         noise[2, :] /= 2
 
         state = state + noise
@@ -268,8 +272,6 @@ class OffRoadNavEnv(gym.Env):
 
     def _render(self, mode='human', close=False):
 
-        worker = self.worker
-
         if self.state is None:
             return
 
@@ -288,11 +290,18 @@ class OffRoadNavEnv(gym.Env):
         # Copy the image before drawing vehicle heading (only when i == 0)
         disp_img = np.copy(self.disp_img)
 
+        """
         for i, (x, y, theta, prev_action, state, current_reward, total_return) in enumerate(
                 zip(
                     xs, ys, thetas, self.prev_action.T, self.state.T,
                     worker.current_reward.squeeze(0).T,
                     worker.total_return.squeeze(0).T
+                )):
+        """
+
+        for i, (x, y, theta, prev_action, state) in enumerate(
+                zip(
+                    xs, ys, thetas, self.prev_action.T, self.state.T,
                 )):
 
             # Draw vehicle on image without copying it first to leave a trajectory
@@ -311,8 +320,10 @@ class OffRoadNavEnv(gym.Env):
                 continue
 
             # Put return, reward, and vehicle states on image for debugging
+            """
             text = "reward = {:.3f}, return = {:.3f} / {:.3f}".format(current_reward, total_return, worker.max_return)
             cv2.putText(disp_img, text, (10, 20), font, font_size, color, 1, cv2.CV_AA)
+            """
 
             text = "action = ({:+.2f} km/h, {:+.2f} deg/s)".format(
                 prev_action[0] * 3.6, prev_action[1] * RAD2DEG)
@@ -326,6 +337,4 @@ class OffRoadNavEnv(gym.Env):
                 state[3], state[4], state[5] * RAD2DEG)
             cv2.putText(disp_img, text, (10, self.height * self.K - 10), font, font_size, color, 1, cv2.CV_AA)
 
-        idx = int(worker.name[-1])
-        cv2.imshow4(idx, disp_img)
-        self.to_disp = disp_img
+        cv2.imshow(self.__class__.__name__, disp_img)

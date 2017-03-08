@@ -270,6 +270,32 @@ class OffRoadNavEnv(gym.Env):
 
         return img[..., None]
 
+    def get_vehicle_color(self, state):
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as colors
+        import matplotlib.cm as cmx
+
+        # v^2 = v_x^2 + v_y^2
+        v = np.sqrt(state[3] ** 2 + state[4] ** 2)
+
+        # just rough guess of maximum velocity since we're using np.tanh to
+        # squash it anyway
+        vmax = self.action_space.high[0]
+        v = (1 + np.tanh(v / vmax)) / 2
+
+        scalarMap = cmx.ScalarMappable(
+            norm=colors.Normalize(vmin=0, vmax=1),
+            cmap=plt.get_cmap('hsv')
+        )
+
+        # HSV (1-v) / 3 ranges from green (v=0) to red (v=1)
+        bgr = scalarMap.to_rgba((1-v)/3, bytes=True)[:3][::-1]
+        bgr = (np.asscalar(bgr[0]), np.asscalar(bgr[1]), np.asscalar(bgr[2]))
+
+        return bgr
+
+        # return (169, 255, 0) if not self.highlight else (0, 0, 255)
+
     def _render(self, mode='human', close=False):
 
         if self.state is None:
@@ -305,7 +331,7 @@ class OffRoadNavEnv(gym.Env):
                 )):
 
             # Draw vehicle on image without copying it first to leave a trajectory
-            vcolor = (169, 255, 0) if not self.highlight else (0, 0, 255)
+            vcolor = self.get_vehicle_color(state)
             size = 0 if not self.highlight else 1
             cv2.circle(self.disp_img, (x, y), size, vcolor, size)
 

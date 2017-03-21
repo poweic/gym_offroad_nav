@@ -43,11 +43,12 @@ class OffRoadNavEnv(gym.Env):
         self.cx, self.cy = 0, self.height / 2
         self.x_min, self.x_max = self.cx - self.width  / 2, self.cx + self.width  / 2
         self.y_min, self.y_max = self.cy - self.height / 2, self.cy + self.height / 2
-        print "\33[33m"
-        print "(cx, cy) = ({}, {})".format(self.cx, self.cy)
+
+        """
+        print "\33[33m(cx, cy) = ({}, {})".format(self.cx, self.cy)
         print "(x_min, x_max) = ({}, {}), (y_min, y_max) = ({}, {})".format(self.x_min, self.x_max, self.y_min, self.y_max)
-        print "(height, width) = ({}, {})".format(self.height, self.width)
-        print "\33[0m"
+        print "(height, width) = ({}, {})\33[0m".format(self.height, self.width)
+        """
         
         self.cell_size = 0.5
 

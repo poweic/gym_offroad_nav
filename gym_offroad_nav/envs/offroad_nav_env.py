@@ -87,7 +87,7 @@ class OffRoadNavEnv(gym.Env):
     def _seed(self, seed=None):
         self.rng, seed = seeding.np_random(seed)
         self.vehicle_model.seed(self.rng)
-        return seed
+        return [seed]
 
     def _step_2(self, action, N):
         ''' Take one step in the environment

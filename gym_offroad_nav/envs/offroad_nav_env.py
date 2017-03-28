@@ -89,6 +89,12 @@ class OffRoadNavEnv(gym.Env):
         self.vehicle_model.seed(self.rng)
         return [seed]
 
+    def _get_obs(self):
+        return {
+            "vehicle_state": self.state.copy().T,
+            "front_view": self.get_front_view(self.state).copy()
+        }
+
     def _step(self, action):
         ''' Take one step in the environment
         state is the vehicle state, not the full MDP state including history.
@@ -120,7 +126,7 @@ class OffRoadNavEnv(gym.Env):
 
         self.prev_action = action.copy()
 
-        return self.state.copy(), reward, done, info
+        return self._get_obs(), reward, done, info
 
     def get_linear_idx(self, ix, iy):
         linear_idx = (self.y_max - 1 - iy) * self.width + (ix - self.x_min)
@@ -195,7 +201,7 @@ class OffRoadNavEnv(gym.Env):
 
         self.state = s0.copy()
 
-        return self.state
+        return self._get_obs()
 
     def debug_bilinear_R(self):
         X = np.linspace(self.x_min, self.x_max, num=self.width  * self.K) * self.cell_size
@@ -326,3 +332,4 @@ class OffRoadNavEnv(gym.Env):
             cv2.putText(disp_img, text, (10, self.height * self.K - 10), font, font_size, color, 1, cv2.CV_AA)
 
         cv2.imshow(self.__class__.__name__, disp_img)
+        cv2.waitKey(1)

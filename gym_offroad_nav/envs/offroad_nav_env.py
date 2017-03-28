@@ -89,39 +89,6 @@ class OffRoadNavEnv(gym.Env):
         self.vehicle_model.seed(self.rng)
         return [seed]
 
-    def _step_2(self, action, N):
-        ''' Take one step in the environment
-        state is the vehicle state, not the full MDP state including history.
-
-        Parameters
-        ----------
-        action : Numpy array
-            The control input for vehicle. [v_forward, yaw_rate]
-
-        Returns
-        -------
-        Tuple
-            A 4-element tuple (state, reward, done, info)
-        '''
-        state = self.state.copy().astype(np.float64)
-        action = action.astype(np.float64)
-        self.state = self.vehicle_model_gpu.predict(state, action, N)
-
-        # Y forward, X lateral
-        # ix = -20, -18, ...0, 1, 19, iy = 0, 1, ... 39
-        x, y = self.state[:2]
-        ix, iy = self.get_ixiy(x, y)
-        done = (ix < self.x_min) | (ix > self.x_max - 1) | (iy < self.y_min) | (iy > self.y_max - 1)
-
-        reward = self._bilinear_reward_lookup(x, y)
-
-        # debug info
-        info = {}
-
-        self.prev_action = action.copy()
-
-        return self.state.copy(), reward, done, info
-
     def _step(self, action):
         ''' Take one step in the environment
         state is the vehicle state, not the full MDP state including history.
@@ -148,15 +115,10 @@ class OffRoadNavEnv(gym.Env):
 
         reward = self._bilinear_reward_lookup(x, y)
 
-        # reward -= np.sum(action ** 2, axis=0) * 0.1
-
         # debug info
         info = {}
 
         self.prev_action = action.copy()
-
-        # FIXME is this the correct way?
-        # done = np.any(done)
 
         return self.state.copy(), reward, done, info
 
@@ -326,10 +288,9 @@ class OffRoadNavEnv(gym.Env):
                 )):
         """
 
-        for i, (x, y, theta, prev_action, state) in enumerate(
-                zip(
-                    xs, ys, thetas, self.prev_action.T, self.state.T,
-                )):
+        for i, (x, y, theta, prev_action, state) in enumerate(zip(
+                xs, ys, thetas, self.prev_action.T, self.state.T
+        )):
 
             # Draw vehicle on image without copying it first to leave a trajectory
             vcolor = self.get_vehicle_color(state)

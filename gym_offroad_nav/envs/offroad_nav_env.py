@@ -1,10 +1,12 @@
 import os
 import gym
 import cv2
+import copy
 import pyglet
 import scipy.io
 import numpy as np
 from time import time
+from collections import deque
 from gym import error, spaces, utils
 from gym.utils import seeding
 from gym.envs.classic_control import rendering
@@ -18,13 +20,19 @@ RAD2DEG = 180. / np.pi
 
 class OffRoadNavEnv(gym.Env):
     metadata = {
-        'render.modes': ['human', 'rgb_array'],
-        # 'video.frames_per_second': 30
+        'render.modes': ['human', 'rgb_array'], # 'video.frames_per_second': 30
     }
 
     def __init__(self):
-
         self.opts = get_options_from_tensorflow_flags()
+        self.initialize()
+
+    def _configure(self, opts):
+        self.opts.update(opts)
+        self.initialize()
+
+    def initialize(self):
+
         self.viewer = None
 
         self.fov = self.opts.field_of_view
@@ -73,6 +81,12 @@ class OffRoadNavEnv(gym.Env):
         self.highlight = False
 
         self.rng = np.random.RandomState()
+
+    def sample_action(self):
+        return np.concatenate([
+            self.action_space.sample()[:, None]
+            for _ in range(self.opts.n_agents_per_worker)
+        ], axis=1)
 
     def load_rewards(self):
 
@@ -211,6 +225,20 @@ class OffRoadNavEnv(gym.Env):
 
         self.state = s0.copy()
 
+        # ==============
+        if self.vehicles is None:
+            current_dir = os.path.dirname(os.path.realpath(__file__))
+            self.vehicles = [
+                Vehicle(current_dir + "/../../car2.png", 0.01)
+                for _ in range(self.opts.n_agents_per_worker)
+            ]
+
+            for vehicle in self.vehicles:
+                self.local_frame.add_geom(vehicle)
+
+        for vehicle, state in zip(self.vehicles, self.state.T):
+            vehicle.reset(state)
+
         return self._get_obs()
 
     def _init_viewer(self):
@@ -295,6 +323,12 @@ class OffRoadNavEnv(gym.Env):
 
     def _render(self, mode='human', close=False):
 
+        for vehicle, state in zip(self.vehicles, self.state.T):
+            vehicle.set_pose(state)
+
+        self.viewer.render()
+
+        """
         if self.state is None:
             return
 
@@ -312,15 +346,6 @@ class OffRoadNavEnv(gym.Env):
 
         # Copy the image before drawing vehicle heading (only when i == 0)
         disp_img = np.copy(self.disp_img)
-
-        """
-        for i, (x, y, theta, prev_action, state, current_reward, total_return) in enumerate(
-                zip(
-                    xs, ys, thetas, self.prev_action.T, self.state.T,
-                    worker.current_reward.squeeze(0).T,
-                    worker.total_return.squeeze(0).T
-                )):
-        """
 
         for i, (x, y, theta, prev_action, state) in enumerate(zip(
                 xs, ys, thetas, self.prev_action.T, self.state.T
@@ -342,10 +367,8 @@ class OffRoadNavEnv(gym.Env):
                 continue
 
             # Put return, reward, and vehicle states on image for debugging
-            """
-            text = "reward = {:.3f}, return = {:.3f} / {:.3f}".format(current_reward, total_return, worker.max_return)
-            cv2.putText(disp_img, text, (10, 20), font, font_size, color, 1, cv2.CV_AA)
-            """
+            # text = "reward = {:.3f}, return = {:.3f} / {:.3f}".format(current_reward, total_return, worker.max_return)
+            # cv2.putText(disp_img, text, (10, 20), font, font_size, color, 1, cv2.CV_AA)
 
             text = "action = ({:+.2f} km/h, {:+.2f} deg/s)".format(
                 prev_action[0] * 3.6, prev_action[1] * RAD2DEG)
@@ -361,25 +384,8 @@ class OffRoadNavEnv(gym.Env):
 
         cv2.imshow(self.__class__.__name__, disp_img)
         cv2.waitKey(1)
+        """
 
-        self.render2()
-
-    def render2(self):
-
-        if self.vehicles is None:
-            current_dir = os.path.dirname(os.path.realpath(__file__))
-            self.vehicles = [
-                Vehicle(current_dir + "/../../car2.png", 0.01)
-                for _ in range(self.opts.n_agents_per_worker)
-            ]
-
-            for vehicle in self.vehicles:
-                self.local_frame.add_geom(vehicle)
-
-        for vehicle, state in zip(self.vehicles, self.state.T):
-            vehicle.set_pose(state)
-
-        self.viewer.render()
 
 class Image(rendering.Geom):
 
@@ -442,14 +448,37 @@ class ReferenceFrame(rendering.Geom):
         self.onetime_geoms = []
 
 class Vehicle(Image):
-    def __init__(self, img, scale):
+    def __init__(self, img, scale, max_trace_length=100):
         super(Vehicle, self).__init__(img, scale)
 
-        self.transform = Transform(translation=(0., 0.))
+        # pose of vehicle (translation + rotation)
+        self.transform = Transform()
         self.add_attr(self.transform)
+
+        # trace of vehicle (historical poses)
+        self.trace = deque(maxlen=max_trace_length)
+
+        self.reset()
 
     def set_pose(self, pose):
         # pose is a 3-dimensional vector (x, y, theta)
         x, y, theta = pose[:3]
-        self.transform.set_translation(x * 1, y * 1)
+        self.transform.set_translation(x, y)
         self.transform.set_rotation(theta)
+
+        p = rendering.make_circle(radius=0.03)
+        p.attrs = []
+        p.add_attr(rendering.Color((0, 1, 0, 1)))
+        p.add_attr(copy.deepcopy(self.transform))
+        self.trace.append(p)
+
+    def reset(self, pose=[0., 0., 0.]):
+        self.trace.clear()
+        self.set_pose(pose)
+
+    def render1(self):
+        super(Vehicle, self).render1()
+        self.transform.disable()
+        for p in self.trace:
+            p.render()
+        self.transform.enable()

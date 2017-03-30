@@ -1,21 +1,19 @@
 #!/usr/bin/python
+import cv2
 import gym
 import gym_offroad_nav.envs
-import cv2
+import numpy as np
 
 env = gym.make("OffRoadNav-v0")
+env.env._configure({
+    "n_agents_per_worker": 8
+})
 
 for i in range(100):
     env.reset()
     done = False
-    action = env.action_space.sample()
-    while not done:
-        # action = env.action_space.sample()
+
+    while not np.any(done):
+        action = env.env.sample_action()
         state, reward, done, _ = env.step(action.squeeze())
         env.render()
-        cv2.waitKey(10)
-
-        """
-        while cv2.waitKey(0) != 32:
-            pass
-        """

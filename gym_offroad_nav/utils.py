@@ -20,8 +20,6 @@ def normalize(x):
     return x
 
 def get_options_from_tensorflow_flags():
-    import tensorflow as tf
-    FLAGS = tf.flags.FLAGS
 
     options = AttrDict({
         'field_of_view': 20,
@@ -38,7 +36,11 @@ def get_options_from_tensorflow_flags():
         'drift': False
     })
 
-    for key in options.keys():
-        options[key] = getattr(FLAGS, key, options[key])
+    try:
+        import tensorflow as tf
+        for key in options.keys():
+            options[key] = getattr(tf.flags.FLAGS, key, options[key])
+    except:
+        pass
 
     return options

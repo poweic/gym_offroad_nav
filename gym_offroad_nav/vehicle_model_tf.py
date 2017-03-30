@@ -2,10 +2,6 @@ import scipy.io
 import tensorflow as tf
 import numpy as np
 FLAGS = tf.flags.FLAGS
-batch_size = FLAGS.batch_size
-seq_length = FLAGS.seq_length
-
-# batch_size = 13
 
 class VehicleModelGPU():
 
@@ -14,6 +10,8 @@ class VehicleModelGPU():
         self.noise_level = noise_level
         self.drift = drift
         self.init_ABCD()
+
+        batch_size = FLAGS.batch_size
 
         self.state  = tf.placeholder(self.dtype, [6, batch_size])
         self.u      = tf.placeholder(self.dtype, [2, batch_size])

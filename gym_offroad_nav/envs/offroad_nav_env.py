@@ -1,11 +1,14 @@
 import os
 import gym
 import cv2
-import numpy as np
+import pyglet
 import scipy.io
+import numpy as np
+from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
-from time import time
+from gym.envs.classic_control import rendering
+Transform = rendering.Transform
 
 from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags
 from gym_offroad_nav.vehicle_model import VehicleModel
@@ -64,6 +67,8 @@ class OffRoadNavEnv(gym.Env):
         self.state = None
 
         self.prev_action = np.zeros((2, 1))
+
+        self.vehicles = None
 
         self.highlight = False
 
@@ -170,8 +175,8 @@ class OffRoadNavEnv(gym.Env):
         return r.reshape(1, -1)
 
     def get_initial_state(self):
-        # state = np.array([+1, 1, -10 * np.pi / 180, 0, 0, 0])
-        state = np.array([-32.5, 10.2, -10 * np.pi / 180, 0, 0, 0])
+        state = np.array([+1, 1, -10 * np.pi / 180, 0, 0, 0])
+        # state = np.array([-32.5, 10.2, -10 * np.pi / 180, 0, 0, 0])
 
         # Reshape to compatiable format
         state = state.astype(np.float32).reshape(6, -1)
@@ -197,6 +202,9 @@ class OffRoadNavEnv(gym.Env):
 
         self.disp_img = np.copy(self.bR)
 
+        if self.viewer is None:
+            self._init_viewer()
+
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
         # self.vehicle_model_gpu.reset(s0)
@@ -204,6 +212,24 @@ class OffRoadNavEnv(gym.Env):
         self.state = s0.copy()
 
         return self._get_obs()
+
+    def _init_viewer(self):
+        # Create viewer
+        height, width = self.bR.shape[:2]
+        self.viewer = rendering.Viewer(width=width, height=height)
+        bg_img = Image(self.bR)
+        bg_img.add_attr(Transform(translation=(width/2, height/2)))
+        self.viewer.add_geom(bg_img)
+
+        scale = self.K / self.cell_size
+        self.local_frame = ReferenceFrame(
+            Transform(
+                translation=(width/2., 0),
+                scale=(scale, scale)
+            )
+        )
+
+        self.viewer.add_geom(self.local_frame)
 
     def debug_bilinear_R(self):
         X = np.linspace(self.x_min, self.x_max, num=self.width  * self.K) * self.cell_size
@@ -335,3 +361,95 @@ class OffRoadNavEnv(gym.Env):
 
         cv2.imshow(self.__class__.__name__, disp_img)
         cv2.waitKey(1)
+
+        self.render2()
+
+    def render2(self):
+
+        if self.vehicles is None:
+            current_dir = os.path.dirname(os.path.realpath(__file__))
+            self.vehicles = [
+                Vehicle(current_dir + "/../../car2.png", 0.01)
+                for _ in range(self.opts.n_agents_per_worker)
+            ]
+
+            for vehicle in self.vehicles:
+                self.local_frame.add_geom(vehicle)
+
+        for vehicle, state in zip(self.vehicles, self.state.T):
+            vehicle.set_pose(state)
+
+        self.viewer.render()
+
+class Image(rendering.Geom):
+
+    def __init__(self, img, scale=1.0):
+        super(Image, self).__init__()
+
+        if type(img) == str:
+            self.img = pyglet.image.load(img)
+        else:
+            self.img = self.to_pyglet_image(img)
+
+        self.height = self.img.height
+        self.width = self.img.width
+        self.scale = scale
+
+        self.attrs = [rendering.Color((1, 1, 1, 1))]
+        self.flip = False
+
+    def to_pyglet_image(self, ndarray):
+
+        height, width, channel = ndarray.shape
+
+        if channel == 1:
+            ndarray = np.repeat(ndarray, 3, axis=-1)
+
+        if channel < 4:
+            ndarray = np.concatenate([ndarray, np.ones((height, width, 1), dtype=np.uint8) * 255], axis=-1)
+
+        image = pyglet.image.ImageData(
+            width, height, 'RGBA', ndarray.tobytes(),
+            pitch= -width * 4
+        )
+
+        return image
+
+    def render1(self):
+        self.img.blit(
+            -self.width/2 * self.scale, -self.height/2 * self.scale,
+            width=self.width * self.scale, height=self.height * self.scale
+        )
+
+class ReferenceFrame(rendering.Geom):
+    def __init__(self, transform):
+        super(ReferenceFrame, self).__init__()
+        self.add_attr(transform)
+        self.geoms = []
+        self.onetime_geoms = []
+
+    def add_geom(self, geom):
+        self.geoms.append(geom)
+
+    def add_onetime(self, geom):
+        self.onetime_geoms.append(geom)
+
+    def render1(self):
+        for g in self.geoms:
+            g.render()
+        for g in self.onetime_geoms:
+            g.render()
+        self.onetime_geoms = []
+
+class Vehicle(Image):
+    def __init__(self, img, scale):
+        super(Vehicle, self).__init__(img, scale)
+
+        self.transform = Transform(translation=(0., 0.))
+        self.add_attr(self.transform)
+
+    def set_pose(self, pose):
+        # pose is a 3-dimensional vector (x, y, theta)
+        x, y, theta = pose[:3]
+        self.transform.set_translation(x * 1, y * 1)
+        self.transform.set_rotation(theta)

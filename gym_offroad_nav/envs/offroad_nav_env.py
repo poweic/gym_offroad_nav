@@ -28,6 +28,7 @@ class OffRoadNavEnv(gym.Env):
 
         # action space = forward velocity + steering angle
         self.action_space = spaces.Box(low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]), high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer]))
+        self.dof = np.prod(self.action_space.shape)
 
         # Observation space = front view (image) + vehicle state (6-dim vector)
         float_min = np.finfo(np.float32).min
@@ -109,6 +110,7 @@ class OffRoadNavEnv(gym.Env):
         Tuple
             A 4-element tuple (state, reward, done, info)
         '''
+        action = action.reshape(self.dof, -1)
         n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
         for j in range(n_sub_steps):
             self.state = self.vehicle_model.predict(self.state, action)

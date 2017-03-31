@@ -7,7 +7,7 @@ from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
 
-from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags
+from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags, load_yaml
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
 
@@ -20,11 +20,16 @@ class OffRoadNavEnv(gym.Env):
 
     def __init__(self):
         self.opts = get_options_from_tensorflow_flags()
+        # self._load_map()
         self.initialize()
 
     def _configure(self, opts):
         self.opts.update(opts)
         self.initialize()
+
+    def _load_map(self):
+        map_def = load_yaml('map-0.yaml')
+        print map_def
 
     def initialize(self):
 
@@ -67,12 +72,8 @@ class OffRoadNavEnv(gym.Env):
 
         self.state = None
 
-        self.prev_action = np.zeros((2, 1))
-
         # Rendering
         self.viewer = None
-
-        self.highlight = False
 
         self.rng = np.random.RandomState()
 
@@ -152,9 +153,9 @@ class OffRoadNavEnv(gym.Env):
         r = self.rewards.flatten()[linear_idx]
         return r
 
-    def get_ixiy(self, x, y, scale=1.):
-        ix = np.floor(x * scale / self.cell_size).astype(np.int32)
-        iy = np.floor(y * scale / self.cell_size).astype(np.int32)
+    def get_ixiy(self, x, y):
+        ix = np.floor(x / self.cell_size).astype(np.int32)
+        iy = np.floor(y / self.cell_size).astype(np.int32)
         return ix, iy
 
     def _bilinear_reward_lookup(self, x, y):
@@ -220,14 +221,18 @@ class OffRoadNavEnv(gym.Env):
     def _init_viewer(self):
         from gym_offroad_nav.rendering import Image, Viewer
 
-        # Create viewer
-        bR = to_image(self.debug_bilinear_R(), 1)
-        height, width = bR.shape[:2]
-        self.viewer = Viewer(width=width, height=height)
+        # Alias for width, height, and scaling. Note that the scaling factor
+        # self.K is used for rendering, so it won't affect any underlying
+        # simulation. Just like zooming in/out the GUI and that's all.
+        w, h, s = self.width, self.height, self.K
 
-        # Add background
-        bg_img = Image(bR, center=(width/2, height/2))
-        self.viewer.add_geom(bg_img)
+        # Create viewer
+        self.viewer = Viewer(width=w, height=h, scale=s)
+
+        # Convert reward to uint8 image (by normalizing) and add as background
+        self.viewer.add_geom(Image(
+            img=to_image(self.rewards), center=(w/2, h/2), scale=s
+        ))
     
     def _init_local_frame(self):
         from gym_offroad_nav.rendering import ReferenceFrame

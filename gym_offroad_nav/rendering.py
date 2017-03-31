@@ -6,6 +6,12 @@ from gym.envs.classic_control import rendering
 
 Viewer = rendering.Viewer
 
+class Viewer(rendering.Viewer):
+    def __init__(self, width, height, display=None, scale=1.0):
+        width *= scale
+        height *= scale
+        super(Viewer, self).__init__(width=width, height=height, display=display)
+
 class Image(rendering.Geom):
 
     def __init__(self, img, center=(0., 0.), scale=1.0):
@@ -21,8 +27,11 @@ class Image(rendering.Geom):
         self.width = self.img.width
         self.scale = scale
 
-        self.center_trans = rendering.Transform(translation=center)
-        self.add_attr(self.center_trans)
+        # center is default to the image center
+        self.center = (
+            -self.width  / 2 + center[0],
+            -self.height / 2 + center[1]
+        )
 
         self.add_attr(rendering.Color((1, 1, 1, 1)))
         self.flip = False
@@ -46,7 +55,7 @@ class Image(rendering.Geom):
 
     def render1(self):
         self.img.blit(
-            -self.width/2 * self.scale, -self.height/2 * self.scale,
+            self.center[0] * self.scale, self.center[1] * self.scale,
             width=self.width * self.scale, height=self.height * self.scale
         )
 

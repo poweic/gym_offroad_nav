@@ -68,8 +68,6 @@ class OffRoadNavEnv(gym.Env):
             self.opts.wheelbase, self.opts.drift
         )
 
-        self.K = 10
-
         self.state = None
 
         # Rendering
@@ -222,9 +220,10 @@ class OffRoadNavEnv(gym.Env):
         from gym_offroad_nav.rendering import Image, Viewer
 
         # Alias for width, height, and scaling. Note that the scaling factor
-        # self.K is used for rendering, so it won't affect any underlying
+        # s is used only for rendering, so it won't affect any underlying
         # simulation. Just like zooming in/out the GUI and that's all.
-        w, h, s = self.width, self.height, self.K
+        w, h, s = self.width, self.height, self.opts.viewport_scale
+        assert int(s) == s, "viewport_scale must be integer, not float"
 
         # Create viewer
         self.viewer = Viewer(width=w, height=h, scale=s)
@@ -239,7 +238,7 @@ class OffRoadNavEnv(gym.Env):
 
         self.local_frame = ReferenceFrame(
             translation=(self.viewer.width/2., 0),
-            scale=self.K / self.cell_size
+            scale=self.opts.viewport_scale / self.cell_size
         )
 
     def _init_vehicles(self):
@@ -252,19 +251,6 @@ class OffRoadNavEnv(gym.Env):
 
         for vehicle in self.vehicles:
             self.local_frame.add_geom(vehicle)
-
-    def debug_bilinear_R(self):
-        X = np.linspace(self.x_min, self.x_max, num=self.width  * self.K) * self.cell_size
-        Y = np.linspace(self.y_min, self.y_max, num=self.height * self.K) * self.cell_size
-
-        xx, yy = np.meshgrid(X, Y)
-
-        bR = self._bilinear_reward_lookup(xx, yy).reshape(xx.shape)
-
-        # reverse Y-axis for image display
-        bR = bR[::-1, :]
-
-        return bR
 
     def get_front_view(self, state):
         x, y, theta = state[:3]

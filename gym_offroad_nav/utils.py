@@ -49,6 +49,7 @@ def get_options_from_tensorflow_flags():
         'track': 'big_track',
         'command_freq': 5,
         'n_agents_per_worker': 1,
+        'viewport_scale': 10,
         'drift': False
     })
 

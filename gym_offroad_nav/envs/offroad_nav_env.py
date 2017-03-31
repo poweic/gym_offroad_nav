@@ -28,7 +28,7 @@ class OffRoadNavEnv(gym.Env):
 
     def initialize(self):
 
-        self.fov = self.opts.field_of_view
+        fov = self.opts.field_of_view
 
         # action space = forward velocity + steering angle
         self.action_space = spaces.Box(low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]), high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer]))
@@ -38,7 +38,7 @@ class OffRoadNavEnv(gym.Env):
         float_min = np.finfo(np.float32).min
         float_max = np.finfo(np.float32).max
         self.observation_space = spaces.Tuple((
-            spaces.Box(low=0, high=255, shape=(self.fov, self.fov, 1)),
+            spaces.Box(low=0, high=255, shape=(fov, fov, 1)),
             spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
 
@@ -199,7 +199,7 @@ class OffRoadNavEnv(gym.Env):
 
     def _reset(self):
         if not hasattr(self, "padded_rewards"):
-            fov = self.fov
+            fov = self.opts.field_of_view
             shape = (np.array(self.rewards.shape) + [fov * 2, fov * 2]).tolist()
             fill = np.min(self.rewards)
             self.padded_rewards = np.full(shape, fill, dtype=np.float32)
@@ -281,7 +281,7 @@ class OffRoadNavEnv(gym.Env):
         iix = np.clip(ix - self.x_min, 0, self.width - 1)
         iiy = np.clip(self.y_max - 1 - iy, 0, self.height - 1)
 
-        fov = self.fov
+        fov = self.opts.field_of_view
 
         cxs, cys = iix + fov, iiy + fov
 

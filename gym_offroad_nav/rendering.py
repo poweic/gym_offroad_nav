@@ -4,10 +4,13 @@ import numpy as np
 from collections import deque
 from gym.envs.classic_control import rendering
 
+Viewer = rendering.Viewer
+
 class Image(rendering.Geom):
 
-    def __init__(self, img, scale=1.0):
+    def __init__(self, img, center=(0., 0.), scale=1.0):
         super(Image, self).__init__()
+        self.attrs = []
 
         if type(img) == str:
             self.img = pyglet.image.load(img)
@@ -18,7 +21,10 @@ class Image(rendering.Geom):
         self.width = self.img.width
         self.scale = scale
 
-        self.attrs = [rendering.Color((1, 1, 1, 1))]
+        self.center_trans = rendering.Transform(translation=center)
+        self.add_attr(self.center_trans)
+
+        self.add_attr(rendering.Color((1, 1, 1, 1)))
         self.flip = False
 
     def to_pyglet_image(self, ndarray):
@@ -45,9 +51,12 @@ class Image(rendering.Geom):
         )
 
 class ReferenceFrame(rendering.Geom):
-    def __init__(self, transform):
+    def __init__(self, translation=(0.0, 0.0), rotation=0.0, scale=1.):
         super(ReferenceFrame, self).__init__()
-        self.add_attr(transform)
+        self.transform = rendering.Transform(
+            translation=translation, rotation=rotation, scale=(scale, scale)
+        )
+        self.add_attr(self.transform)
         self.geoms = []
         self.onetime_geoms = []
 

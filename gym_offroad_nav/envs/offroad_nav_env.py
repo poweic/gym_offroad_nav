@@ -223,34 +223,28 @@ class OffRoadNavEnv(gym.Env):
         return self._get_obs()
 
     def _init_viewer(self):
-        from gym.envs.classic_control import rendering
-        from gym_offroad_nav.rendering import Image, ReferenceFrame, Vehicle
+        from gym_offroad_nav.rendering import Image, Viewer
 
         # Create viewer
         height, width = self.bR.shape[:2]
-        self.viewer = rendering.Viewer(width=width, height=height)
+        self.viewer = Viewer(width=width, height=height)
 
-        bg_img = Image(self.bR)
-        bg_img.add_attr(rendering.Transform(translation=(width/2, height/2)))
+        # Add background
+        bg_img = Image(self.bR, center=(width/2, height/2))
         self.viewer.add_geom(bg_img)
     
     def _init_local_frame(self):
-        from gym.envs.classic_control import rendering
-        from gym_offroad_nav.rendering import Image, ReferenceFrame, Vehicle
+        from gym_offroad_nav.rendering import ReferenceFrame
 
         height, width = self.bR.shape[:2]
 
-        scale = self.K / self.cell_size
         self.local_frame = ReferenceFrame(
-            rendering.Transform(
-                translation=(width/2., 0),
-                scale=(scale, scale)
-            )
+            translation=(width/2., 0),
+            scale=self.K / self.cell_size
         )
 
     def _init_vehicles(self):
-        from gym.envs.classic_control import rendering
-        from gym_offroad_nav.rendering import Image, ReferenceFrame, Vehicle
+        from gym_offroad_nav.rendering import Vehicle
 
         self.vehicles = [
             Vehicle(keep_trace=True)

@@ -3,6 +3,7 @@ import cv2
 import gym
 import gym_offroad_nav.envs
 import numpy as np
+import time
 
 env = gym.make("OffRoadNav-v0")
 env.env._configure({

@@ -1,16 +1,11 @@
 import os
 import gym
 import cv2
-import copy
-import pyglet
 import scipy.io
 import numpy as np
 from time import time
-from collections import deque
 from gym import error, spaces, utils
 from gym.utils import seeding
-from gym.envs.classic_control import rendering
-Transform = rendering.Transform
 
 from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags
 from gym_offroad_nav.vehicle_model import VehicleModel
@@ -32,8 +27,6 @@ class OffRoadNavEnv(gym.Env):
         self.initialize()
 
     def initialize(self):
-
-        self.viewer = None
 
         self.fov = self.opts.field_of_view
 
@@ -76,7 +69,8 @@ class OffRoadNavEnv(gym.Env):
 
         self.prev_action = np.zeros((2, 1))
 
-        self.vehicles = None
+        # Rendering
+        self.viewer = None
 
         self.highlight = False
 
@@ -189,8 +183,8 @@ class OffRoadNavEnv(gym.Env):
         return r.reshape(1, -1)
 
     def get_initial_state(self):
-        state = np.array([+1, 1, -10 * np.pi / 180, 0, 0, 0])
-        # state = np.array([-32.5, 10.2, -10 * np.pi / 180, 0, 0, 0])
+        # state = np.array([+1, 1, -10 * np.pi / 180, 0, 0, 0])
+        state = np.array([-32.5, 10.2, -10 * np.pi / 180, 0, 0, 0])
 
         # Reshape to compatiable format
         state = state.astype(np.float32).reshape(6, -1)
@@ -216,48 +210,55 @@ class OffRoadNavEnv(gym.Env):
 
         self.disp_img = np.copy(self.bR)
 
-        if self.viewer is None:
-            self._init_viewer()
-
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
         # self.vehicle_model_gpu.reset(s0)
 
         self.state = s0.copy()
 
-        # ==============
-        if self.vehicles is None:
-            current_dir = os.path.dirname(os.path.realpath(__file__))
-            self.vehicles = [
-                Vehicle(current_dir + "/../../car2.png", 0.01)
-                for _ in range(self.opts.n_agents_per_worker)
-            ]
-
-            for vehicle in self.vehicles:
-                self.local_frame.add_geom(vehicle)
-
-        for vehicle, state in zip(self.vehicles, self.state.T):
-            vehicle.reset(state)
+        if self.viewer:
+            for vehicle, state in zip(self.vehicles, self.state.T):
+                vehicle.reset(state)
 
         return self._get_obs()
 
     def _init_viewer(self):
+        from gym.envs.classic_control import rendering
+        from gym_offroad_nav.rendering import Image, ReferenceFrame, Vehicle
+
         # Create viewer
         height, width = self.bR.shape[:2]
         self.viewer = rendering.Viewer(width=width, height=height)
+
         bg_img = Image(self.bR)
-        bg_img.add_attr(Transform(translation=(width/2, height/2)))
+        bg_img.add_attr(rendering.Transform(translation=(width/2, height/2)))
         self.viewer.add_geom(bg_img)
+    
+    def _init_local_frame(self):
+        from gym.envs.classic_control import rendering
+        from gym_offroad_nav.rendering import Image, ReferenceFrame, Vehicle
+
+        height, width = self.bR.shape[:2]
 
         scale = self.K / self.cell_size
         self.local_frame = ReferenceFrame(
-            Transform(
+            rendering.Transform(
                 translation=(width/2., 0),
                 scale=(scale, scale)
             )
         )
 
-        self.viewer.add_geom(self.local_frame)
+    def _init_vehicles(self):
+        from gym.envs.classic_control import rendering
+        from gym_offroad_nav.rendering import Image, ReferenceFrame, Vehicle
+
+        self.vehicles = [
+            Vehicle(keep_trace=True)
+            for _ in range(self.opts.n_agents_per_worker)
+        ]
+
+        for vehicle in self.vehicles:
+            self.local_frame.add_geom(vehicle)
 
     def debug_bilinear_R(self):
         X = np.linspace(self.x_min, self.x_max, num=self.width  * self.K) * self.cell_size
@@ -319,166 +320,24 @@ class OffRoadNavEnv(gym.Env):
 
         return bgr
 
-        # return (169, 255, 0) if not self.highlight else (0, 0, 255)
+    def _init_rendering(self):
+        if self.viewer is None:
+            self._init_viewer()
+            self._init_local_frame()
+            self._init_vehicles()
+            self.viewer.add_geom(self.local_frame)
 
     def _render(self, mode='human', close=False):
+
+        if close:
+            if self.viewer is not None:
+                self.viewer.close()
+                self.viewer = None
+            return
+
+        self._init_rendering()
 
         for vehicle, state in zip(self.vehicles, self.state.T):
             vehicle.set_pose(state)
 
         self.viewer.render()
-
-        """
-        if self.state is None:
-            return
-
-        x, y = self.state[:2]
-        ix, iy = self.get_ixiy(x, y, self.K)
-        thetas = self.state[2]
-
-        # Turn ix, iy to image coordinate on disp_img (reward)
-        xs, ys = self.width*self.K/2-1 + ix, self.height*self.K-1-iy
-
-        # Font family, size, and color
-        font = cv2.FONT_HERSHEY_PLAIN
-        font_size = 1
-        color = (44, 65, 221)
-
-        # Copy the image before drawing vehicle heading (only when i == 0)
-        disp_img = np.copy(self.disp_img)
-
-        for i, (x, y, theta, prev_action, state) in enumerate(zip(
-                xs, ys, thetas, self.prev_action.T, self.state.T
-        )):
-
-            # Draw vehicle on image without copying it first to leave a trajectory
-            vcolor = self.get_vehicle_color(state)
-            size = 0 if not self.highlight else 1
-            cv2.circle(self.disp_img, (x, y), size, vcolor, size)
-
-            pt1 = (x, y)
-            cv2.circle(disp_img, pt1, 2, (0, 0, 255), 2)
-            dx, dy = -int(50 * np.sin(theta)), int(50 * np.cos(theta))
-            pt2 = (x + dx, y - dy)
-            cv2.arrowedLine(disp_img, pt1, pt2, (0, 0, 255), tipLength=0.2)
-            cv2.putText(disp_img, str(i), pt1, font, 1, (255, 255, 0), 1, cv2.CV_AA)
-
-            if i != 0:
-                continue
-
-            # Put return, reward, and vehicle states on image for debugging
-            # text = "reward = {:.3f}, return = {:.3f} / {:.3f}".format(current_reward, total_return, worker.max_return)
-            # cv2.putText(disp_img, text, (10, 20), font, font_size, color, 1, cv2.CV_AA)
-
-            text = "action = ({:+.2f} km/h, {:+.2f} deg/s)".format(
-                prev_action[0] * 3.6, prev_action[1] * RAD2DEG)
-            cv2.putText(disp_img, text, (10, self.height * self.K - 50), font, font_size, color, 1, cv2.CV_AA)
-
-            text = "(x, y, theta)  = ({:+.2f}, {:+.2f}, {:+.2f})".format(
-                state[0], state[1], np.mod(state[2] * RAD2DEG, 360))
-            cv2.putText(disp_img, text, (10, self.height * self.K - 30), font, font_size, color, 1, cv2.CV_AA)
-
-            text = "(x', y', theta') = ({:+.2f}, {:+.2f}, {:+.2f})".format(
-                state[3], state[4], state[5] * RAD2DEG)
-            cv2.putText(disp_img, text, (10, self.height * self.K - 10), font, font_size, color, 1, cv2.CV_AA)
-
-        cv2.imshow(self.__class__.__name__, disp_img)
-        cv2.waitKey(1)
-        """
-
-
-class Image(rendering.Geom):
-
-    def __init__(self, img, scale=1.0):
-        super(Image, self).__init__()
-
-        if type(img) == str:
-            self.img = pyglet.image.load(img)
-        else:
-            self.img = self.to_pyglet_image(img)
-
-        self.height = self.img.height
-        self.width = self.img.width
-        self.scale = scale
-
-        self.attrs = [rendering.Color((1, 1, 1, 1))]
-        self.flip = False
-
-    def to_pyglet_image(self, ndarray):
-
-        height, width, channel = ndarray.shape
-
-        if channel == 1:
-            ndarray = np.repeat(ndarray, 3, axis=-1)
-
-        if channel < 4:
-            ndarray = np.concatenate([ndarray, np.ones((height, width, 1), dtype=np.uint8) * 255], axis=-1)
-
-        image = pyglet.image.ImageData(
-            width, height, 'RGBA', ndarray.tobytes(),
-            pitch= -width * 4
-        )
-
-        return image
-
-    def render1(self):
-        self.img.blit(
-            -self.width/2 * self.scale, -self.height/2 * self.scale,
-            width=self.width * self.scale, height=self.height * self.scale
-        )
-
-class ReferenceFrame(rendering.Geom):
-    def __init__(self, transform):
-        super(ReferenceFrame, self).__init__()
-        self.add_attr(transform)
-        self.geoms = []
-        self.onetime_geoms = []
-
-    def add_geom(self, geom):
-        self.geoms.append(geom)
-
-    def add_onetime(self, geom):
-        self.onetime_geoms.append(geom)
-
-    def render1(self):
-        for g in self.geoms:
-            g.render()
-        for g in self.onetime_geoms:
-            g.render()
-        self.onetime_geoms = []
-
-class Vehicle(Image):
-    def __init__(self, img, scale, max_trace_length=100):
-        super(Vehicle, self).__init__(img, scale)
-
-        # pose of vehicle (translation + rotation)
-        self.transform = Transform()
-        self.add_attr(self.transform)
-
-        # trace of vehicle (historical poses)
-        self.trace = deque(maxlen=max_trace_length)
-
-        self.reset()
-
-    def set_pose(self, pose):
-        # pose is a 3-dimensional vector (x, y, theta)
-        x, y, theta = pose[:3]
-        self.transform.set_translation(x, y)
-        self.transform.set_rotation(theta)
-
-        p = rendering.make_circle(radius=0.03)
-        p.attrs = []
-        p.add_attr(rendering.Color((0, 1, 0, 1)))
-        p.add_attr(copy.deepcopy(self.transform))
-        self.trace.append(p)
-
-    def reset(self, pose=[0., 0., 0.]):
-        self.trace.clear()
-        self.set_pose(pose)
-
-    def render1(self):
-        super(Vehicle, self).render1()
-        self.transform.disable()
-        for p in self.trace:
-            p.render()
-        self.transform.enable()

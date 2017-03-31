@@ -1,13 +1,15 @@
+import colored_traceback.always
+
 import os
 import gym
 import cv2
-import scipy.io
 import numpy as np
 from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
 
-from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags, load_yaml
+from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags
+from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder, StaticRewarder
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
 
@@ -20,26 +22,27 @@ class OffRoadNavEnv(gym.Env):
 
     def __init__(self):
         self.opts = get_options_from_tensorflow_flags()
-        # self._load_map()
+
         self.initialize()
 
     def _configure(self, opts):
         self.opts.update(opts)
         self.initialize()
 
-    def _load_map(self):
-        map_def = load_yaml('map-0.yaml')
-        print map_def
-
     def initialize(self):
 
-        fov = self.opts.field_of_view
+        # Load map definition from YAML file from configuration file
+        map_def_fn = "{}/../../maps/{}.yaml".format(
+            os.path.dirname(os.path.realpath(__file__)), self.opts.map_def
+        )
+        self.map = OffRoadMap(map_def_fn)
 
         # action space = forward velocity + steering angle
         self.action_space = spaces.Box(low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]), high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer]))
         self.dof = np.prod(self.action_space.shape)
 
         # Observation space = front view (image) + vehicle state (6-dim vector)
+        fov = self.opts.field_of_view
         float_min = np.finfo(np.float32).min
         float_max = np.finfo(np.float32).max
         self.observation_space = spaces.Tuple((
@@ -48,19 +51,7 @@ class OffRoadNavEnv(gym.Env):
         ))
 
         # A matrix containing rewards, we need a constant version and 
-        self.rewards = self.load_rewards()
-        self.height, self.width = self.rewards.shape
-        self.cx, self.cy = 0, self.height / 2
-        self.x_min, self.x_max = self.cx - self.width  / 2, self.cx + self.width  / 2
-        self.y_min, self.y_max = self.cy - self.height / 2, self.cy + self.height / 2
-
-        """
-        print "\33[33m(cx, cy) = ({}, {})".format(self.cx, self.cy)
-        print "(x_min, x_max) = ({}, {}), (y_min, y_max) = ({}, {})".format(self.x_min, self.x_max, self.y_min, self.y_max)
-        print "(height, width) = ({}, {})\33[0m".format(self.height, self.width)
-        """
-        
-        self.cell_size = 0.5
+        self.rewarder = Rewarder(self)
 
         # self.vehicle_model_gpu = VehicleModelGPU(...)
         self.vehicle_model = VehicleModel(
@@ -80,22 +71,6 @@ class OffRoadNavEnv(gym.Env):
             self.action_space.sample()[:, None]
             for _ in range(self.opts.n_agents_per_worker)
         ], axis=1)
-
-    def load_rewards(self):
-
-        reward_dir = os.path.dirname(os.path.realpath(__file__)) + "/../../data"
-        reward_fn = "{}/{}.mat".format(reward_dir, self.opts.track)
-        rewards = scipy.io.loadmat(reward_fn)["reward"].astype(np.float32)
-        # rewards -= 100
-        # rewards -= 15
-        rewards = (rewards - np.min(rewards)) / (np.max(rewards) - np.min(rewards))
-        # rewards = (rewards - self.cell_size) * 2 # 128
-        rewards = (rewards - 0.7) * 2
-        rewards[rewards > 0] *= 10
-
-        # rewards[rewards < 0.1] = -1
-
-        return rewards
 
     def _seed(self, seed=None):
         self.rng, seed = seeding.np_random(seed)
@@ -122,7 +97,7 @@ class OffRoadNavEnv(gym.Env):
         Tuple
             A 4-element tuple (state, reward, done, info)
         '''
-        action = action.reshape(self.dof, -1)
+        action = action.reshape(self.dof, self.opts.n_agents_per_worker)
         n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
         for j in range(n_sub_steps):
             self.state = self.vehicle_model.predict(self.state, action)
@@ -130,10 +105,11 @@ class OffRoadNavEnv(gym.Env):
         # Y forward, X lateral
         # ix = -20, -18, ...0, 1, 19, iy = 0, 1, ... 39
         x, y = self.state[:2]
-        ix, iy = self.get_ixiy(x, y)
-        done = (ix < self.x_min) | (ix > self.x_max - 1) | (iy < self.y_min) | (iy > self.y_max - 1)
+        done = ~self.map.contains(x, y)
+        # ix, iy = self.map.get_ixiy(x, y)
+        # done = (ix < self.x_min) | (ix > self.x_max - 1) | (iy < self.y_min) | (iy > self.y_max - 1)
 
-        reward = self._bilinear_reward_lookup(x, y)
+        reward = self.rewarder.eval(self.state)
 
         # debug info
         info = {}
@@ -142,48 +118,9 @@ class OffRoadNavEnv(gym.Env):
 
         return self._get_obs(), reward, done, info
 
-    def get_linear_idx(self, ix, iy):
-        linear_idx = (self.y_max - 1 - iy) * self.width + (ix - self.x_min)
-        return linear_idx
-
-    def _get_reward(self, ix, iy):
-        linear_idx = self.get_linear_idx(ix, iy)
-        r = self.rewards.flatten()[linear_idx]
-        return r
-
-    def get_ixiy(self, x, y):
-        ix = np.floor(x / self.cell_size).astype(np.int32)
-        iy = np.floor(y / self.cell_size).astype(np.int32)
-        return ix, iy
-
-    def _bilinear_reward_lookup(self, x, y):
-        ix, iy = self.get_ixiy(x, y)
-        # print "(x, y) = ({}, {}), (ix, iy) = ({}, {})".format(x, y, ix, iy)
-
-        x0 = np.clip(ix    , self.x_min, self.x_max - 1).astype(np.int32)
-        y0 = np.clip(iy    , self.y_min, self.y_max - 1).astype(np.int32)
-        x1 = np.clip(ix + 1, self.x_min, self.x_max - 1).astype(np.int32)
-        y1 = np.clip(iy + 1, self.y_min, self.y_max - 1).astype(np.int32)
-
-        f00 = self._get_reward(x0, y0)
-        f01 = self._get_reward(x0, y1)
-        f10 = self._get_reward(x1, y0)
-        f11 = self._get_reward(x1, y1)
-
-        xx = (x / self.cell_size - ix).astype(np.float32)
-        yy = (y / self.cell_size - iy).astype(np.float32)
-
-        w00 = (1.-xx) * (1.-yy)
-        w01 = (   yy) * (1.-xx)
-        w10 = (   xx) * (1.-yy)
-        w11 = (   xx) * (   yy)
-
-        r = f00*w00 + f01*w01 + f10*w10 + f11*w11
-        return r.reshape(1, -1)
-
     def get_initial_state(self):
         # state = np.array([+1, 1, -10 * np.pi / 180, 0, 0, 0])
-        state = np.array([-32.5, 10.2, -10 * np.pi / 180, 0, 0, 0])
+        state = np.array(self.map.initial_pose)
 
         # Reshape to compatiable format
         state = state.astype(np.float32).reshape(6, -1)
@@ -198,11 +135,16 @@ class OffRoadNavEnv(gym.Env):
 
     def _reset(self):
         if not hasattr(self, "padded_rewards"):
+            rewards = self.rewarder.static_rewarder.rewards
             fov = self.opts.field_of_view
-            shape = (np.array(self.rewards.shape) + [fov * 2, fov * 2]).tolist()
-            fill = np.min(self.rewards)
+            shape = (np.array(rewards.shape) + [fov * 2, fov * 2]).tolist()
+            fill = np.min(rewards)
             self.padded_rewards = np.full(shape, fill, dtype=np.float32)
-            self.padded_rewards[fov:-fov, fov:-fov] = self.rewards
+            self.padded_rewards[fov:-fov, fov:-fov] = rewards
+
+            img = to_image(self.padded_rewards)
+            # cv2.imshow("padded_rewards", img)
+            # cv2.waitKey(0)
 
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
@@ -222,7 +164,7 @@ class OffRoadNavEnv(gym.Env):
         # Alias for width, height, and scaling. Note that the scaling factor
         # s is used only for rendering, so it won't affect any underlying
         # simulation. Just like zooming in/out the GUI and that's all.
-        w, h, s = self.width, self.height, self.opts.viewport_scale
+        w, h, s = self.map.width, self.map.height, self.opts.viewport_scale
         assert int(s) == s, "viewport_scale must be integer, not float"
 
         # Create viewer
@@ -230,7 +172,8 @@ class OffRoadNavEnv(gym.Env):
 
         # Convert reward to uint8 image (by normalizing) and add as background
         self.viewer.add_geom(Image(
-            img=to_image(self.rewards), center=(w/2, h/2), scale=s
+            img=self.map.rgb_map, # to_image(self.rewards),
+            center=(w/2, h/2), scale=s
         ))
     
     def _init_local_frame(self):
@@ -238,7 +181,7 @@ class OffRoadNavEnv(gym.Env):
 
         self.local_frame = ReferenceFrame(
             translation=(self.viewer.width/2., 0),
-            scale=self.opts.viewport_scale / self.cell_size
+            scale=self.opts.viewport_scale / self.map.cell_size
         )
 
     def _init_vehicles(self):
@@ -255,10 +198,10 @@ class OffRoadNavEnv(gym.Env):
     def get_front_view(self, state):
         x, y, theta = state[:3]
 
-        ix, iy = self.get_ixiy(x, y)
+        ix, iy = self.map.get_ixiy(x, y)
 
-        iix = np.clip(ix - self.x_min, 0, self.width - 1)
-        iiy = np.clip(self.y_max - 1 - iy, 0, self.height - 1)
+        iix = np.clip(ix - self.map.bounds.x_min, 0, self.map.width - 1)
+        iiy = np.clip(self.map.bounds.y_max - 1 - iy, 0, self.map.height - 1)
 
         fov = self.opts.field_of_view
 
@@ -274,30 +217,6 @@ class OffRoadNavEnv(gym.Env):
             img[i, :, :] = rotated[cy-fov:cy, cx-fov/2:cx+fov/2]
 
         return img[..., None]
-
-    def get_vehicle_color(self, state):
-        import matplotlib.pyplot as plt
-        import matplotlib.colors as colors
-        import matplotlib.cm as cmx
-
-        # v^2 = v_x^2 + v_y^2
-        v = np.sqrt(state[3] ** 2 + state[4] ** 2)
-
-        # just rough guess of maximum velocity since we're using np.tanh to
-        # squash it anyway
-        vmax = self.action_space.high[0]
-        v = (1 + np.tanh(v / vmax)) / 2
-
-        scalarMap = cmx.ScalarMappable(
-            norm=colors.Normalize(vmin=0, vmax=1),
-            cmap=plt.get_cmap('hsv')
-        )
-
-        # HSV (1-v) / 3 ranges from green (v=0) to red (v=1)
-        bgr = scalarMap.to_rgba((1-v)/3, bytes=True)[:3][::-1]
-        bgr = (np.asscalar(bgr[0]), np.asscalar(bgr[1]), np.asscalar(bgr[2]))
-
-        return bgr
 
     def _init_rendering(self):
         if self.viewer is None:

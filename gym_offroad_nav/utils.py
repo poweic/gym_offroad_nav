@@ -1,26 +1,10 @@
 import cv2
-import yaml
 import numpy as np
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
-
-def save_yaml(fn, data):
-    data = {
-        k: v.tolist() if isinstance(v, np.ndarray) else v
-        for k, v in data.iteritems()
-    }
-    yaml.dump(data, open(fn, 'w'), width=1000)
-
-def load_yaml(fn):
-    data = yaml.load(open(fn, 'r'))
-    data = {
-        k: np.asarray(v) if isinstance(v, list) else v
-        for k, v in data.iteritems()
-    }
-    return data
 
 def to_image(R, K=1, interpolation=cv2.INTER_NEAREST):
     R = normalize(R)
@@ -46,10 +30,10 @@ def get_options_from_tensorflow_flags():
         'timestep': 0.0025,
         'vehicle_model_noise_level': 0.02,
         'wheelbase': 2.0,
-        'track': 'big_track',
+        'map_def': 'map0',
         'command_freq': 5,
         'n_agents_per_worker': 1,
-        'viewport_scale': 10,
+        'viewport_scale': 3,
         'drift': False
     })
 

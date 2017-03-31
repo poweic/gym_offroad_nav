@@ -205,11 +205,6 @@ class OffRoadNavEnv(gym.Env):
             self.padded_rewards = np.full(shape, fill, dtype=np.float32)
             self.padded_rewards[fov:-fov, fov:-fov] = self.rewards
 
-        if not hasattr(self, "bR"):
-            self.bR = to_image(self.debug_bilinear_R(), 1)
-
-        self.disp_img = np.copy(self.bR)
-
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
         # self.vehicle_model_gpu.reset(s0)
@@ -226,20 +221,19 @@ class OffRoadNavEnv(gym.Env):
         from gym_offroad_nav.rendering import Image, Viewer
 
         # Create viewer
-        height, width = self.bR.shape[:2]
+        bR = to_image(self.debug_bilinear_R(), 1)
+        height, width = bR.shape[:2]
         self.viewer = Viewer(width=width, height=height)
 
         # Add background
-        bg_img = Image(self.bR, center=(width/2, height/2))
+        bg_img = Image(bR, center=(width/2, height/2))
         self.viewer.add_geom(bg_img)
     
     def _init_local_frame(self):
         from gym_offroad_nav.rendering import ReferenceFrame
 
-        height, width = self.bR.shape[:2]
-
         self.local_frame = ReferenceFrame(
-            translation=(width/2., 0),
+            translation=(self.viewer.width/2., 0),
             scale=self.K / self.cell_size
         )
 

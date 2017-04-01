@@ -3,32 +3,6 @@ import cv2
 import numpy as np
 from gym_offroad_nav.utils import AttrDict
 
-metadata = AttrDict({
-    'class_id_to_class_name': {
-        0: 'void',
-        1: 'smooth trail',
-        2: 'low vegetation (traversable, drive cautiously, despite geometry)',
-        3: 'slow down',
-        4: 'water (not traversable, despite geometry)',
-        5: 'obstacles (non traversable)',
-        6: 'bushes (non traversable)',
-        7: 'tree (non traversable)',
-    },
-    'class_id_to_rgb': {
-        0: [255, 255, 255],
-        1: [178, 176, 153],
-        2: [128, 255, 0],
-        3: [156, 76, 30],
-        4: [255, 0, 128],
-        5: [1, 88, 255],
-        6: [0, 160, 0],
-        7: [40, 80, 0]
-    },
-    'class_id_to_rewards': [
-        0, 1, -20, 0.8, 0.4, -20, -10, -20
-    ]
-})
-
 def save_yaml(fn, data):
     data = {
         k: v.tolist() if isinstance(v, np.ndarray) else v
@@ -90,7 +64,7 @@ class OffRoadMap(object):
         img = np.zeros((labels.shape[0], labels.shape[1], 3), dtype=np.uint8)
         classes = np.unique(labels)
         for c in classes:
-            img[labels == c] = metadata.class_id_to_rgb[c]
+            img[labels == c] = self.class_id_to_rgb[c]
         return img
 
     def get_ixiy(self, x, y):
@@ -105,7 +79,6 @@ class DynamicObject(object):
 class Rewarder(object):
     def __init__(self, env):
         self.env = env
-
         self.static_rewarder = StaticRewarder(env.map)
         self.rewarders = []
 
@@ -125,7 +98,7 @@ class StaticRewarder(Rewarder):
         rewards = np.zeros((labels.shape[0], labels.shape[1]), dtype=np.float32)
         classes = np.unique(labels)
         for c in classes:
-            rewards[labels == c] = metadata.class_id_to_rewards[c]
+            rewards[labels == c] = self.map.class_id_to_rewards[c]
         return rewards
 
     def eval(self, state):

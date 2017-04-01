@@ -37,7 +37,10 @@ class OffRoadNavEnv(gym.Env):
         self.map = OffRoadMap(map_def_fn)
 
         # action space = forward velocity + steering angle
-        self.action_space = spaces.Box(low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]), high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer]))
+        self.action_space = spaces.Box(
+            low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]),
+            high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer])
+        )
         self.dof = np.prod(self.action_space.shape)
 
         # Observation space = front view (image) + vehicle state (6-dim vector)

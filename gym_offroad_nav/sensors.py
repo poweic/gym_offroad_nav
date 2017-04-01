@@ -48,15 +48,14 @@ def pad_image(img, padding, fill_value=None):
 # This sensor model return the front view of the vehicle as an image of shape
 # fov x fov, where fov is the field of view (how far you see).
 class FrontViewer(SensorModel):
-    def __init__(self, map, rewarder, field_of_view, noise_level=0):
+    def __init__(self, map, field_of_view, noise_level=0):
         super(FrontViewer, self).__init__(noise_level)
 
         self.map = map
-        self.rewarder = rewarder
         self.field_of_view = field_of_view
 
         self.padded_rewards = pad_image(
-            self.rewarder.static_rewarder.rewards,
+            self.map.rewards,
             self.field_of_view
         )
 

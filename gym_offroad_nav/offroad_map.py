@@ -28,8 +28,24 @@ class OffRoadMap(object):
         self._init_boundary()
 
         self.rgb_map = self.colorize(self.map_structure)
+        self.rewards = self.cvt_map_structure_to_rewards(self.map_structure)
+
         # cv2.imshow("rgb_map", self.rgb_map)
         # cv2.waitKey(500)
+
+    def colorize(self, labels):
+        img = np.zeros((labels.shape[0], labels.shape[1], 3), dtype=np.uint8)
+        classes = np.unique(labels)
+        for c in classes:
+            img[labels == c] = self.class_id_to_rgb[c]
+        return img
+
+    def cvt_map_structure_to_rewards(self, labels):
+        rewards = np.zeros((labels.shape[0], labels.shape[1]), dtype=np.float32)
+        classes = np.unique(labels)
+        for c in classes:
+            rewards[labels == c] = self.class_id_to_rewards[c]
+        return rewards
 
     def _init_boundary(self):
 
@@ -60,13 +76,6 @@ class OffRoadMap(object):
             & (iy >= b.y_min) & (iy <= b.y_max - 1)
         return inside
 
-    def colorize(self, labels):
-        img = np.zeros((labels.shape[0], labels.shape[1], 3), dtype=np.uint8)
-        classes = np.unique(labels)
-        for c in classes:
-            img[labels == c] = self.class_id_to_rgb[c]
-        return img
-
     def get_ixiy(self, x, y):
         ix = np.floor(x / self.cell_size).astype(np.int32)
         iy = np.floor(y / self.cell_size).astype(np.int32)
@@ -90,16 +99,7 @@ class Rewarder(object):
 
 class StaticRewarder(Rewarder):
     def __init__(self, map):
-
         self.map = map
-        self.rewards = self.cvt_map_structure_to_rewards(map.map_structure)
-
-    def cvt_map_structure_to_rewards(self, labels):
-        rewards = np.zeros((labels.shape[0], labels.shape[1]), dtype=np.float32)
-        classes = np.unique(labels)
-        for c in classes:
-            rewards[labels == c] = self.map.class_id_to_rewards[c]
-        return rewards
 
     def eval(self, state):
         x, y = state[:2]
@@ -136,11 +136,11 @@ class StaticRewarder(Rewarder):
         return r.reshape(1, -1)
 
     def _get_reward(self, ix, iy):
-        linear_idx = self._get_linear_idx(ix, iy)
-        r = self.rewards.flatten()[linear_idx]
-        return r
-
-    def _get_linear_idx(self, ix, iy):
         bounds = self.map.bounds
+        r = self.map.rewards[bounds.y_max - 1 - iy, ix - bounds.x_min]
+
+        # this is legacy code, make sure I didn't break it
         linear_idx = (bounds.y_max - 1 - iy) * self.map.width + (ix - bounds.x_min)
-        return linear_idx
+        assert np.all(r == self.map.rewards.flatten()[linear_idx])
+
+        return r

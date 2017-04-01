@@ -9,7 +9,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 
 from gym_offroad_nav.utils import get_options_from_tensorflow_flags, AttrDict
-from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder, StaticRewarder
+from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
@@ -36,24 +36,8 @@ class OffRoadNavEnv(gym.Env):
         )
         self.map = OffRoadMap(map_def_fn)
 
-        # action space = forward velocity + steering angle
-        self.action_space = spaces.Box(
-            low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]),
-            high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer])
-        )
-        self.dof = np.prod(self.action_space.shape)
-
-        # Observation space = front view (image) + vehicle state (6-dim vector)
-        fov = self.opts.field_of_view
-        float_min = np.finfo(np.float32).min
-        float_max = np.finfo(np.float32).max
-        self.observation_space = spaces.Tuple((
-            spaces.Box(low=0, high=255, shape=(fov, fov, 1)),
-            spaces.Box(low=float_min, high=float_max, shape=(6, 1))
-        ))
-
         # A matrix containing rewards, we need a constant version and 
-        self.rewarder = Rewarder(self)
+        self.rewarder = Rewarder(self.map)
 
         # create sensor models, now we just use a possibly noisy odometry and
         # the simplest front view sensor
@@ -68,6 +52,24 @@ class OffRoadNavEnv(gym.Env):
         )
 
         self.state = None
+
+        # action space = forward velocity + steering angle
+        self.action_space = spaces.Box(
+            low=np.array([self.opts.min_mu_vf, self.opts.min_mu_steer]),
+            high=np.array([self.opts.max_mu_vf, self.opts.max_mu_steer])
+        )
+        self.dof = np.prod(self.action_space.shape)
+
+        # Observation space = front view (image) + vehicle state (6-dim vector)
+        fov = self.opts.field_of_view
+        float_min = np.finfo(np.float32).min
+        float_max = np.finfo(np.float32).max
+
+        # TODO observation_space should be automatically deduced from sensors
+        self.observation_space = spaces.Tuple((
+            spaces.Box(low=0, high=255, shape=(fov, fov, 1)),
+            spaces.Box(low=float_min, high=float_max, shape=(6, 1))
+        ))
 
         # Rendering
         self.viewer = None

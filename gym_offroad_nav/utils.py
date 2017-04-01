@@ -19,6 +19,9 @@ def normalize(x):
     x = np.clip(x, 0, 255).astype(np.uint8)
     return x
 
+def clip(x, minimum, maximum):
+    return np.clip(x, minimum, maximum).astype(np.int32)
+
 def get_options_from_tensorflow_flags():
 
     options = AttrDict({

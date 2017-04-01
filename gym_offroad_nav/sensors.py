@@ -53,6 +53,7 @@ class FrontViewer(SensorModel):
 
         self.map = map
         self.field_of_view = field_of_view
+        self.noise_level = noise_level
 
         self.padded_rewards = pad_image(
             self.map.rewards,

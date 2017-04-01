@@ -8,12 +8,11 @@ from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
 
-from gym_offroad_nav.utils import to_image, get_options_from_tensorflow_flags
+from gym_offroad_nav.utils import get_options_from_tensorflow_flags, AttrDict
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder, StaticRewarder
+from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
-
-RAD2DEG = 180. / np.pi
 
 class OffRoadNavEnv(gym.Env):
     metadata = {
@@ -53,10 +52,18 @@ class OffRoadNavEnv(gym.Env):
         # A matrix containing rewards, we need a constant version and 
         self.rewarder = Rewarder(self)
 
+        # create sensor models, now we just use a possibly noisy odometry and
+        # the simplest front view sensor
+        self.sensors = {
+            'vehicle_state': Odometry(self.opts.odom_noise_level),
+            'front_view': FrontViewer(
+                self.map, self.rewarder, self.opts.field_of_view
+            )
+        }
+
         # self.vehicle_model_gpu = VehicleModelGPU(...)
         self.vehicle_model = VehicleModel(
-            self.opts.timestep, self.opts.vehicle_model_noise_level,
-            self.opts.wheelbase, self.opts.drift
+            self.opts.timestep, self.opts.wheelbase, self.opts.drift
         )
 
         self.state = None
@@ -74,14 +81,14 @@ class OffRoadNavEnv(gym.Env):
 
     def _seed(self, seed=None):
         self.rng, seed = seeding.np_random(seed)
-        self.vehicle_model.seed(self.rng)
+        for sensor in self.sensors.itervalues():
+            sensor.seed(self.rng)
         return [seed]
 
     def _get_obs(self):
-        return {
-            "vehicle_state": self.state.copy().T,
-            "front_view": self.get_front_view(self.state).copy()
-        }
+        return AttrDict({
+            k: sensor.eval(self.state) for k, sensor in self.sensors.iteritems()
+        })
 
     def _step(self, action):
         ''' Take one step in the environment
@@ -103,11 +110,8 @@ class OffRoadNavEnv(gym.Env):
             self.state = self.vehicle_model.predict(self.state, action)
 
         # Y forward, X lateral
-        # ix = -20, -18, ...0, 1, 19, iy = 0, 1, ... 39
         x, y = self.state[:2]
         done = ~self.map.contains(x, y)
-        # ix, iy = self.map.get_ixiy(x, y)
-        # done = (ix < self.x_min) | (ix > self.x_max - 1) | (iy < self.y_min) | (iy > self.y_max - 1)
 
         reward = self.rewarder.eval(self.state)
 
@@ -134,18 +138,6 @@ class OffRoadNavEnv(gym.Env):
         return state
 
     def _reset(self):
-        if not hasattr(self, "padded_rewards"):
-            rewards = self.rewarder.static_rewarder.rewards
-            fov = self.opts.field_of_view
-            shape = (np.array(rewards.shape) + [fov * 2, fov * 2]).tolist()
-            fill = np.min(rewards)
-            self.padded_rewards = np.full(shape, fill, dtype=np.float32)
-            self.padded_rewards[fov:-fov, fov:-fov] = rewards
-
-            img = to_image(self.padded_rewards)
-            # cv2.imshow("padded_rewards", img)
-            # cv2.waitKey(0)
-
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
         # self.vehicle_model_gpu.reset(s0)
@@ -172,7 +164,7 @@ class OffRoadNavEnv(gym.Env):
 
         # Convert reward to uint8 image (by normalizing) and add as background
         self.viewer.add_geom(Image(
-            img=self.map.rgb_map, # to_image(self.rewards),
+            img=self.map.rgb_map,
             center=(w/2, h/2), scale=s
         ))
     
@@ -194,29 +186,6 @@ class OffRoadNavEnv(gym.Env):
 
         for vehicle in self.vehicles:
             self.local_frame.add_geom(vehicle)
-
-    def get_front_view(self, state):
-        x, y, theta = state[:3]
-
-        ix, iy = self.map.get_ixiy(x, y)
-
-        iix = np.clip(ix - self.map.bounds.x_min, 0, self.map.width - 1)
-        iiy = np.clip(self.map.bounds.y_max - 1 - iy, 0, self.map.height - 1)
-
-        fov = self.opts.field_of_view
-
-        cxs, cys = iix + fov, iiy + fov
-
-        angles = -theta * RAD2DEG
-
-        img = np.zeros((len(angles), fov, fov), dtype=np.float32)
-        for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
-            M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
-            rotated = cv2.warpAffine(self.padded_rewards, M, self.padded_rewards.T.shape)
-            # print "[{}:{}, {}:{}]".format(cy-fov, cy, cx-fov/2, cx+fov/2)
-            img[i, :, :] = rotated[cy-fov:cy, cx-fov/2:cx+fov/2]
-
-        return img[..., None]
 
     def _init_rendering(self):
         if self.viewer is None:

@@ -25,7 +25,7 @@ metadata = AttrDict({
         7: [40, 80, 0]
     },
     'class_id_to_rewards': [
-        0, 1, -1, 0.8, 0.4, -20, -10, -20
+        0, 1, -20, 0.8, 0.4, -20, -10, -20
     ]
 })
 
@@ -134,15 +134,17 @@ class StaticRewarder(Rewarder):
 
     def _bilinear_reward_lookup(self, x, y):
         ix, iy = self.map.get_ixiy(x, y)
-        # print "(x, y) = ({}, {}), (ix, iy) = ({}, {})".format(x, y, ix, iy)
 
         # alias for self.map.bounds
         bounds = self.map.bounds
 
-        x0 = np.clip(ix    , bounds.x_min, bounds.x_max - 1).astype(np.int32)
-        y0 = np.clip(iy    , bounds.y_min, bounds.y_max - 1).astype(np.int32)
-        x1 = np.clip(ix + 1, bounds.x_min, bounds.x_max - 1).astype(np.int32)
-        y1 = np.clip(iy + 1, bounds.y_min, bounds.y_max - 1).astype(np.int32)
+        def clip(x, minimum, maximum):
+            return np.clip(x, minimum, maximum).astype(np.int32)
+
+        x0 = clip(ix    , bounds.x_min, bounds.x_max - 1)
+        y0 = clip(iy    , bounds.y_min, bounds.y_max - 1)
+        x1 = clip(ix + 1, bounds.x_min, bounds.x_max - 1)
+        y1 = clip(iy + 1, bounds.y_min, bounds.y_max - 1)
 
         f00 = self._get_reward(x0, y0)
         f01 = self._get_reward(x0, y1)
@@ -169,12 +171,3 @@ class StaticRewarder(Rewarder):
         bounds = self.map.bounds
         linear_idx = (bounds.y_max - 1 - iy) * self.map.width + (ix - bounds.x_min)
         return linear_idx
-
-# Move the following classes to `sensors.py`
-class SensorModel(object):
-    def __init__(self):
-        pass
-
-class Lidar(SensorModel):
-    def __init__(self):
-        pass

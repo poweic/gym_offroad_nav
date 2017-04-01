@@ -4,7 +4,7 @@ import numpy as np
 
 class VehicleModel():
 
-    def __init__(self, timestep, noise_level=0., wheelbase=2.0, drift=False):
+    def __init__(self, timestep, wheelbase=2.0, drift=False):
 
         # Load vehicle model ABCD
         current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -16,10 +16,8 @@ class VehicleModel():
 
         #
         self.timestep = timestep
-        self.noise_level = noise_level
         self.wheelbase = wheelbase
         self.drift = drift
-        self.rng = np.random.RandomState()
 
         if not drift:
             self.A[0][0] = 0
@@ -40,9 +38,6 @@ class VehicleModel():
         # x' = Ax + Bu (prediction)
         # y' = Cx + Du (measurement)
         self.x = None
-
-    def seed(self, rng):
-        self.rng = rng
 
     def _predict(self, x, u):
         u = u.reshape(2, -1)
@@ -73,10 +68,7 @@ class VehicleModel():
         # theta is in radian
         theta = state[2]
 
-        # c, s = np.cos(theta)[0], np.sin(theta)[0]
-        # M = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
-        # delta = np.dot(M, state[3:6]) * self.timestep
-
+        # Use uni-cycle model (this assume vehicle has no width)
         c, s = np.cos(theta), np.sin(theta)
         M = np.array([[c, -s], [s, c]])
         M = np.rollaxis(M, 2, 0)
@@ -88,10 +80,6 @@ class VehicleModel():
 
         # dx = v * dt
         delta = V * self.timestep
-
-        # Add some noise using delta * (1 + noise) instead of delta + noise
-        noise = self.rng.rand(*delta.shape) * self.noise_level
-        delta *= 1 + noise
 
         # x2 = x1 + dx
         state[0:3] += delta

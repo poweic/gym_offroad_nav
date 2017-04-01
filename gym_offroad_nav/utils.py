@@ -28,12 +28,12 @@ def get_options_from_tensorflow_flags():
         'min_mu_steer': -30 * np.pi / 180,
         'max_mu_steer': +30 * np.pi / 180,
         'timestep': 0.0025,
-        'vehicle_model_noise_level': 0.02,
+        'odom_noise_level': 0.02,
         'wheelbase': 2.0,
         'map_def': 'map0',
         'command_freq': 5,
         'n_agents_per_worker': 1,
-        'viewport_scale': 3,
+        'viewport_scale': 5,
         'drift': False
     })
 

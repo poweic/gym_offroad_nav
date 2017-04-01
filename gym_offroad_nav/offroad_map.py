@@ -1,7 +1,7 @@
 import cv2
 import yaml
 import numpy as np
-from gym_offroad_nav.utils import AttrDict
+from gym_offroad_nav.utils import AttrDict, dirname
 from gym_offroad_nav.interactable import OffRoadScene, Coin
 
 def save_yaml(fn, data):
@@ -19,10 +19,11 @@ def load_yaml(fn):
     })
 
 class OffRoadMap(object):
-    def __init__(self, map_def_fn):
+    def __init__(self, map_def):
 
         # Load map definition from YAML file and store values as self attributes
-        map_def = load_yaml(map_def_fn)
+        map_def = "{}/../maps/{}.yaml".format(dirname(__file__), map_def)
+        map_def = load_yaml(map_def)
         for k, v in map_def.iteritems():
             setattr(self, k, v)
 

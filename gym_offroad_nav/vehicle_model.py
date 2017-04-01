@@ -1,13 +1,14 @@
 import os
 import scipy.io
 import numpy as np
+from gym_offroad_nav.utils import dirname
 
 class VehicleModel():
 
     def __init__(self, timestep, wheelbase=2.0, drift=False):
 
         # Load vehicle model ABCD
-        current_dir = os.path.dirname(os.path.realpath(__file__))
+        current_dir = dirname(__file__)
         model = scipy.io.loadmat(current_dir + "/vehicle_model_ABCD.mat")
         self.A = model["A"]
         self.B = model["B"]

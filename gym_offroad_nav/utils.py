@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -12,6 +13,9 @@ def to_image(R, K=1, interpolation=cv2.INTER_NEAREST):
     R = np.concatenate([R, R, R], axis=2)
     return R
 
+def dirname(fn):
+    return os.path.dirname(os.path.realpath(__file__))
+
 def normalize(x):
     value_range = np.max(x) - np.min(x)
     if value_range != 0:
@@ -22,7 +26,8 @@ def normalize(x):
 def clip(x, minimum, maximum):
     return np.clip(x, minimum, maximum).astype(np.int32)
 
-def get_options_from_tensorflow_flags():
+# Get options from TensorFlow FLAGS, use default values if not provided
+def get_options_from_TF_flags():
 
     options = AttrDict({
         'field_of_view': 20,

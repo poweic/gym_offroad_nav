@@ -8,7 +8,7 @@ from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
 
-from gym_offroad_nav.utils import get_options_from_tensorflow_flags, AttrDict
+from gym_offroad_nav.utils import get_options_from_TF_flags, AttrDict
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
@@ -20,7 +20,7 @@ class OffRoadNavEnv(gym.Env):
     }
 
     def __init__(self):
-        self.opts = get_options_from_tensorflow_flags()
+        self.opts = get_options_from_TF_flags()
 
         self.initialize()
 
@@ -31,10 +31,7 @@ class OffRoadNavEnv(gym.Env):
     def initialize(self):
 
         # Load map definition from YAML file from configuration file
-        map_def_fn = "{}/../../maps/{}.yaml".format(
-            os.path.dirname(os.path.realpath(__file__)), self.opts.map_def
-        )
-        self.map = OffRoadMap(map_def_fn)
+        self.map = OffRoadMap(self.opts.map_def)
 
         # A matrix containing rewards, we need a constant version and 
         self.rewarder = Rewarder(self.map)

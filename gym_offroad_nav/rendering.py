@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 RAD2DEG = 57.29577951308232
@@ -91,6 +92,31 @@ class Viewer(object):
         self.onetime_geoms = []
         return arr
 
+def _add_attrs(geom, attrs):
+    if "color" in attrs:
+        geom.set_color(*attrs["color"])
+    if "linewidth" in attrs:
+        geom.set_linewidth(attrs["linewidth"])
+
+class Geom(object):
+    def __init__(self, *arg, **kwargs):
+        self._color=Color((0, 0, 0, 1.0))
+        self.attrs = [self._color]
+    def render(self):
+        for attr in reversed(self.attrs):
+            attr.enable()
+        self.render1()
+        for attr in self.attrs:
+            attr.disable()
+    def render1(self):
+        raise NotImplementedError
+    def add_attr(self, attr):
+        self.attrs.append(attr)
+    def set_alpha(self, a):
+        self._color.vec4 = self._color.vec4[:3] + (a,)
+    def set_color(self, r, g, b):
+        self._color.vec4 = (r, g, b, 1)
+
 class Attr(object):
     def enable(self):
         raise NotImplementedError
@@ -116,22 +142,26 @@ class Transform(Attr):
     def set_scale(self, newx, newy):
         self.scale = (float(newx), float(newy))
 
-class Geom(object):
-    def __init__(self):
-        self._color=Color((0, 0, 0, 1.0))
-        self.attrs = [self._color]
-    def render(self):
-        for attr in reversed(self.attrs):
-            attr.enable()
-        self.render1()
-        for attr in self.attrs:
-            attr.disable()
-    def render1(self):
-        raise NotImplementedError
-    def add_attr(self, attr):
-        self.attrs.append(attr)
-    def set_color(self, r, g, b):
-        self._color.vec4 = (r, g, b, 1)
+class Color(Attr):
+    def __init__(self, vec4):
+        self.vec4 = vec4
+    def enable(self):
+        glColor4f(*self.vec4)
+
+class LineStyle(Attr):
+    def __init__(self, style):
+        self.style = style
+    def enable(self):
+        glEnable(GL_LINE_STIPPLE)
+        glLineStipple(1, self.style)
+    def disable(self):
+        glDisable(GL_LINE_STIPPLE)
+
+class LineWidth(Attr):
+    def __init__(self, stroke):
+        self.stroke = stroke
+    def enable(self):
+        glLineWidth(self.stroke)
 
 class Point(Geom):
     def __init__(self):
@@ -140,6 +170,45 @@ class Point(Geom):
         glBegin(GL_POINTS) # draw point
         glVertex3f(0.0, 0.0, 0.0)
         glEnd()
+
+class FilledPolygon(Geom):
+    def __init__(self, v):
+        Geom.__init__(self)
+        self.v = v
+    def render1(self):
+        if   len(self.v) == 4 : glBegin(GL_QUADS)
+        elif len(self.v)  > 4 : glBegin(GL_POLYGON)
+        else: glBegin(GL_TRIANGLES)
+        for p in self.v:
+            glVertex3f(p[0], p[1],0)  # draw each vertex
+        glEnd()
+
+def make_circle(radius=10, res=30, filled=True):
+    points = []
+    for i in range(res):
+        ang = 2*math.pi*i / res
+        points.append((math.cos(ang)*radius, math.sin(ang)*radius))
+    if filled:
+        return FilledPolygon(points)
+    else:
+        return PolyLine(points, True)
+
+def make_polygon(v, filled=True):
+    if filled: return FilledPolygon(v)
+    else: return PolyLine(v, True)
+
+def make_polyline(v):
+    return PolyLine(v, False)
+
+class Compound(Geom):
+    def __init__(self, gs):
+        Geom.__init__(self)
+        self.gs = gs
+        for g in self.gs:
+            g.attrs = [a for a in g.attrs if not isinstance(a, Color)]
+    def render1(self):
+        for g in self.gs:
+            g.render()
 
 class PolyLine(Geom):
     def __init__(self, v, close):
@@ -156,18 +225,19 @@ class PolyLine(Geom):
     def set_linewidth(self, x):
         self.linewidth.stroke = x
 
-class Color(Attr):
-    def __init__(self, vec4):
-        self.vec4 = vec4
-    def enable(self):
-        glColor4f(*self.vec4)
+class Line(Geom):
+    def __init__(self, start=(0.0, 0.0), end=(0.0, 0.0)):
+        Geom.__init__(self)
+        self.start = start
+        self.end = end
+        self.linewidth = LineWidth(1)
+        self.add_attr(self.linewidth)
 
-class LineWidth(Attr):
-    def __init__(self, stroke):
-        self.stroke = stroke
-    def enable(self):
-        glLineWidth(self.stroke)
-
+    def render1(self):
+        glBegin(GL_LINES)
+        glVertex2f(*self.start)
+        glVertex2f(*self.end)
+        glEnd()
 class Image(Geom):
 
     def __init__(self, img, center=(0., 0.), scale=1.0):

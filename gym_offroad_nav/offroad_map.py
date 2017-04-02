@@ -36,7 +36,13 @@ class OffRoadMap(object):
         # Maybe we can use the idea of "context" to create static/dynamic object
         self.scene = OffRoadScene(map=self)
         self.static_objects = []
-        self.dynamic_objects = []
+        # self.dynamic_objects = [Coin(map=map, position=(-32., 15.))]
+        self.dynamic_objects = [
+            Coin(map=map, position=(
+                np.random.randint(self.bounds.x_min, self.bounds.x_max),
+                np.random.randint(self.bounds.y_min, self.bounds.y_max)
+            )) for _ in range(100)
+        ]
 
         self.interactables = [self.scene] + self.static_objects + self.dynamic_objects
 
@@ -74,9 +80,12 @@ class OffRoadMap(object):
         )
 
         """
-        print "\33[33m(cx, cy) = ({}, {})".format(self.cx, self.cy)
-        print "(x_min, x_max) = ({}, {}), (y_min, y_max) = ({}, {})".format(self.x_min, self.x_max, self.y_min, self.y_max)
-        print "(height, width) = ({}, {})\33[0m".format(self.height, self.width)
+        print "(cx, cy) = ({}, {})".format(cx, cy)
+        print "(x_min, x_max) = ({}, {}), (y_min, y_max) = ({}, {})".format(
+            self.bounds.x_min, self.bounds.x_max,
+            self.bounds.y_min, self.bounds.y_max
+        )
+        print "(height, width) = ({}, {})".format(self.height, self.width)
         """
 
     def contains(self, x, y):

@@ -18,4 +18,3 @@ for i in range(100):
         action = env.env.sample_action()
         state, reward, done, _ = env.step(action.squeeze())
         env.render()
-        cv2.waitKey(100)

@@ -148,6 +148,9 @@ class OffRoadNavEnv(gym.Env):
             for vehicle, state in zip(self.vehicles, self.state.T):
                 vehicle.reset(state)
 
+            for obj in self.map.dynamic_objects:
+                obj.reset()
+
         return self._get_obs()
 
     # All the rendering goes here...
@@ -194,6 +197,9 @@ class OffRoadNavEnv(gym.Env):
             self._init_local_frame()
             self._init_vehicles()
             self.viewer.add_geom(self.local_frame)
+
+            for obj in self.map.dynamic_objects:
+                self.local_frame.add_geom(obj)
 
     def _render(self, mode='human', close=False):
 

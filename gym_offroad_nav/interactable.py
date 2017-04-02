@@ -3,12 +3,12 @@ import numpy as np
 from copy import deepcopy
 from collections import deque
 from gym_offroad_nav.utils import AttrDict, clip
-from gym_offroad_nav.rendering import PolyLine, Transform, Geom, Color, Point
+from gym_offroad_nav import rendering
 
 class Interactable(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, map):
+    def __init__(self, map, *args, **kwargs):
         self.map = map
 
     @abc.abstractmethod
@@ -18,7 +18,7 @@ class Interactable(object):
 class DynamicObject(Interactable):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(DynamicObject, self).__init__(**kwargs)
 
     def react(self, state):
@@ -27,29 +27,55 @@ class DynamicObject(Interactable):
 class StaticObject(Interactable):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(StaticObject, self).__init__(**kwargs)
 
     @abc.abstractmethod
     def react(self, state):
         pass
 
-class Coin(Interactable):
+class Coin(Interactable, rendering.Geom):
 
-    def __init__(self, position, radius, reward, **kwargs):
-        super(OffRoadScene, self).__init__(**kwargs)
+    def __init__(self, position, radius=1, reward=100., **kwargs):
+        Interactable.__init__(self, **kwargs)
+        rendering.Geom.__init__(self, **kwargs)
 
-        self.position = position
+        self.position = np.array([position]).T
         self.radius = radius
         self.reward = reward
 
+        self.transform = rendering.Transform(translation=position)
         # One should only call this when rendering
         # self.transform = rendering.Transform()
+        self.coin = rendering.make_circle(0.5)
+        self.coin.add_attr(self.transform)
+        self.coin.set_color(r=0, g=0, b=1)
+
+        self.reset()
 
     def react(self, state):
-        return 1
+        if not self.valid:
+            return 0
 
-class Vehicle(Geom):
+        distance = np.linalg.norm(state[:2] - self.position, axis=0)
+        if np.any(distance <= self.radius):
+            self.valid = False
+            return self.reward
+
+        return 0
+
+    def reset(self):
+        self.valid = True
+        self.blink_on = True
+
+    def render1(self):
+        if not self.valid:
+            return
+        self.blink_on ^= True
+        self.coin.set_alpha(int(self.blink_on))
+        self.coin.render()
+
+class Vehicle(rendering.Geom):
     def __init__(self, size=2., keep_trace=False, max_trace_length=100):
         super(Vehicle, self).__init__()
 
@@ -57,14 +83,14 @@ class Vehicle(Geom):
         self.keep_trace = keep_trace
 
         # pose of vehicle (translation + rotation)
-        self.transform = Transform()
+        self.transform = rendering.Transform()
 
         # vertices of vehicles
         h, w = size, size / 2
         r, l, t, b = w/2, -w/2, h/2, -h/2
         vertices = [(l,b), (l,t), (r,t), (r,b), (0, 0), (l, b), (r, b)]
-        self.polyline = PolyLine(vertices, close=False)
-        self.polyline.attrs = [Color((1, 0, 0, 1)), self.transform]
+        self.polyline = rendering.PolyLine(vertices, close=False)
+        self.polyline.attrs = [rendering.Color((1, 0, 0, 1)), self.transform]
 
         # trace of vehicle (historical poses)
         self.trace = deque(maxlen=max_trace_length)
@@ -78,8 +104,8 @@ class Vehicle(Geom):
         self.transform.set_rotation(theta)
 
         if self.keep_trace:
-            p = Point()
-            p.attrs = [Color((1, 0, 0, 1)), deepcopy(self.transform)]
+            p = rendering.Point()
+            p.attrs = [rendering.Color((1, 0, 0, 1)), deepcopy(self.transform)]
             self.trace.append(p)
 
     def reset(self, pose=[0., 0., 0.]):
@@ -93,7 +119,7 @@ class Vehicle(Geom):
 
 class OffRoadScene(Interactable):
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(OffRoadScene, self).__init__(**kwargs)
 
     def react(self, state):

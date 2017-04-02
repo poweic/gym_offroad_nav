@@ -68,44 +68,29 @@ class FrontViewer(SensorModel):
             self.field_of_view
         )
 
-        """
-        cv2.imshow("padded_rewards", to_image(self.padded_rewards))
-        cv2.waitKey(500)
-        """
-
     def eval(self, state):
         
         cxs, cys, angles = self._get_cx_cy_angle(state)
         n_agents = len(angles)
 
-        n_channels = 4
-
         height, width = self.padded_rewards.shape[:2]
         size = (width, height)
         fov = self.field_of_view
-        print "fov = {}".format(fov)
 
+        n_channels = 4
         images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
+
         for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
-            M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
             # print "[{}:{}, {}:{}]".format(cy-fov, cy, cx-fov/2, cx+fov/2)
+            M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
 
-            rotated_rewards = cv2.warpAffine(self.padded_rewards, M, size)
-            rotated_rgb_map = cv2.warpAffine(self.padded_rgb_map, M, size)
+            sx = slice(cx-fov/2, cx+fov/2)
+            sy = slice(cy-fov, cy)
 
-            images[i, :, :, 0 ] = rotated_rewards[cy-fov:cy, cx-fov/2:cx+fov/2]
-            images[i, :, :, 1:] = rotated_rgb_map[cy-fov:cy, cx-fov/2:cx+fov/2]
+            images[i, ..., 0 ] = cv2.warpAffine(self.padded_rewards, M, size)[sy, sx]
+            images[i, ..., 1:] = cv2.warpAffine(self.padded_rgb_map, M, size)[sy, sx]
 
-        # visualization (for debugging purpose)
-        disp_img = np.zeros((2*fov, n_agents * fov, 3), dtype=np.uint8)
-        for i, img in enumerate(images):
-            disp_img[:fov, i*fov:(i+1)*fov] += (img[..., 0:1] * 255).astype(np.uint8)
-            disp_img[fov:, i*fov:(i+1)*fov] = img[..., -1:0:-1].astype(np.uint8)
-
-        # cv2.imshow("reward", images[0, ..., 0])
-        # cv2.imshow("rgb", images[0, ..., -1:0:-1].astype(np.uint8))
-        cv2.imshow("front_view", disp_img)
-        cv2.waitKey(5)
+        self._visualize(images)
 
         return images
 
@@ -122,6 +107,22 @@ class FrontViewer(SensorModel):
         angles = -theta * RAD2DEG
 
         return cxs, cys, angles
+
+    def _visualize(self, images):
+
+        n_agents, height, width = images.shape[:3]
+
+        # visualization (for debugging purpose)
+        disp_img = np.zeros((2*height, n_agents*width, 3), dtype=np.uint8)
+        for i, img in enumerate(images):
+            s = slice(i*width, (i+1)*width)
+            disp_img[:height, s] += (img[..., 0:1] * 255).astype(np.uint8)
+            disp_img[height:, s] = img[..., -1:0:-1].astype(np.uint8)
+
+        # cv2.imshow("reward", images[0, ..., 0])
+        # cv2.imshow("rgb", images[0, ..., -1:0:-1].astype(np.uint8))
+        cv2.imshow("front_view", disp_img)
+        cv2.waitKey(5)
 
 class Lidar(SensorModel):
     def __init__(self):

@@ -7,7 +7,7 @@ import time
 
 env = gym.make("OffRoadNav-v0")
 env.env._configure({
-    "n_agents_per_worker": 16
+    "n_agents_per_worker": 2
 })
 
 for i in range(100):

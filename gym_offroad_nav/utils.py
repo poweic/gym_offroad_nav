@@ -38,10 +38,10 @@ def get_options_from_TF_flags():
         'timestep': 0.0025,
         'odom_noise_level': 0.02,
         'wheelbase': 2.0,
-        'map_def': 'map0',
+        'map_def': 'map1',
         'command_freq': 5,
         'n_agents_per_worker': 1,
-        'viewport_scale': 5,
+        'viewport_scale': 4,
         'drift': False
     })
 

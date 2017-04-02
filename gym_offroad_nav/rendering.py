@@ -183,7 +183,7 @@ class FilledPolygon(Geom):
             glVertex3f(p[0], p[1],0)  # draw each vertex
         glEnd()
 
-def make_circle(radius=10, res=30, filled=True):
+def make_circle(radius=10, res=20, filled=True):
     points = []
     for i in range(res):
         ang = 2*math.pi*i / res
@@ -238,6 +238,7 @@ class Line(Geom):
         glVertex2f(*self.start)
         glVertex2f(*self.end)
         glEnd()
+
 class Image(Geom):
 
     def __init__(self, img, center=(0., 0.), scale=1.0):
@@ -310,3 +311,17 @@ class ReferenceFrame(Geom):
             g.render()
         self.onetime_geoms = []
 
+"""
+TODO: maybe I should link this library with ROS
+class Grid(object):
+    def __init__(self, center, ):
+
+        self.attrs = []
+
+        label = pyglet.text.Label(
+            'Hello, world', font_name='Times New Roman', font_size=36, x=x, y=y,
+            anchor_x='center', anchor_y='center', color=(255, 255, 255, 255)
+        )
+
+    def render1(self):
+"""

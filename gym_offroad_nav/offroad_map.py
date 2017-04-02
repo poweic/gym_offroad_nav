@@ -34,13 +34,13 @@ class OffRoadMap(object):
 
         # TODO
         # Maybe we can use the idea of "context" to create static/dynamic object
+        # instead of passing map to every constructor.
         self.scene = OffRoadScene(map=self)
         self.static_objects = []
-        # self.dynamic_objects = [Coin(map=map, position=(-32., 15.))]
         self.dynamic_objects = [
             Coin(map=map, position=(
-                np.random.randint(self.bounds.x_min, self.bounds.x_max),
-                np.random.randint(self.bounds.y_min, self.bounds.y_max)
+                np.random.randint(self.bounds.x_min * self.cell_size, self.bounds.x_max * self.cell_size),
+                np.random.randint(self.bounds.y_min * self.cell_size, self.bounds.y_max * self.cell_size)
             )) for _ in range(100)
         ]
 
@@ -50,17 +50,21 @@ class OffRoadMap(object):
         # cv2.waitKey(500)
 
     def colorize(self, labels):
+        print "colorizing ..."
         img = np.zeros((labels.shape[0], labels.shape[1], 3), dtype=np.uint8)
         classes = np.unique(labels)
         for c in classes:
             img[labels == c] = self.class_id_to_rgb[c]
+        print "done."
         return img
 
     def cvt_map_structure_to_rewards(self, labels):
+        print "converting to reward ..."
         rewards = np.zeros((labels.shape[0], labels.shape[1]), dtype=np.float32)
         classes = np.unique(labels)
         for c in classes:
             rewards[labels == c] = self.class_id_to_rewards[c]
+        print "done."
         return rewards
 
     def _init_boundary(self):
@@ -79,14 +83,12 @@ class OffRoadMap(object):
             y_max = cy + h / 2,
         )
 
-        """
         print "(cx, cy) = ({}, {})".format(cx, cy)
         print "(x_min, x_max) = ({}, {}), (y_min, y_max) = ({}, {})".format(
             self.bounds.x_min, self.bounds.x_max,
             self.bounds.y_min, self.bounds.y_max
         )
         print "(height, width) = ({}, {})".format(self.height, self.width)
-        """
 
     def contains(self, x, y):
         b = self.bounds

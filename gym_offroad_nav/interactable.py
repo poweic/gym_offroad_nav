@@ -2,7 +2,7 @@ import abc
 import numpy as np
 from copy import deepcopy
 from collections import deque
-from gym_offroad_nav.utils import AttrDict, clip
+from gym_offroad_nav.utils import AttrDict, clip, dirname
 from gym_offroad_nav import rendering
 
 class Interactable(object):
@@ -36,7 +36,7 @@ class StaticObject(Interactable):
 
 class Coin(Interactable, rendering.Geom):
 
-    def __init__(self, position, radius=1, reward=100., **kwargs):
+    def __init__(self, position, radius=2., reward=100., **kwargs):
         Interactable.__init__(self, **kwargs)
         rendering.Geom.__init__(self, **kwargs)
 
@@ -45,35 +45,28 @@ class Coin(Interactable, rendering.Geom):
         self.reward = reward
 
         self.transform = rendering.Transform(translation=position)
-        # One should only call this when rendering
-        # self.transform = rendering.Transform()
-        self.coin = rendering.make_circle(0.5)
-        self.coin.add_attr(self.transform)
-        self.coin.set_color(r=0, g=0, b=1)
+        color = rendering.Color((247./255, 223./255, 56./255, 0.9))
+        self.coin = rendering.Image(dirname(__file__) + "/../assets/coin.png", scale=0.015)
+        self.coin.attrs = [color, self.transform]
+
+        self.coin_radius = rendering.make_circle(radius, filled=False)
+        self.coin_radius.attrs = [color, self.transform]
 
         self.reset()
 
     def react(self, state):
-        if not self.valid:
-            return 0
-
         distance = np.linalg.norm(state[:2] - self.position, axis=0)
-        if np.any(distance <= self.radius):
-            self.valid = False
-            return self.reward
-
-        return 0
+        self.valid &= (distance > self.radius)
+        return self.reward * self.valid
 
     def reset(self):
         self.valid = True
-        self.blink_on = True
 
     def render1(self):
-        if not self.valid:
+        if not np.any(self.valid):
             return
-        self.blink_on ^= True
-        self.coin.set_alpha(int(self.blink_on))
         self.coin.render()
+        self.coin_radius.render()
 
 class Vehicle(rendering.Geom):
     def __init__(self, size=2., keep_trace=False, max_trace_length=100):

@@ -1,6 +1,9 @@
 import abc
 import numpy as np
+from copy import deepcopy
+from collections import deque
 from gym_offroad_nav.utils import AttrDict, clip
+from gym_offroad_nav.rendering import PolyLine, Transform, Geom, Color, Point
 
 class Interactable(object):
     __metaclass__ = abc.ABCMeta
@@ -45,6 +48,48 @@ class Coin(Interactable):
 
     def react(self, state):
         return 1
+
+class Vehicle(Geom):
+    def __init__(self, size=2., keep_trace=False, max_trace_length=100):
+        super(Vehicle, self).__init__()
+
+        self.size = size
+        self.keep_trace = keep_trace
+
+        # pose of vehicle (translation + rotation)
+        self.transform = Transform()
+
+        # vertices of vehicles
+        h, w = size, size / 2
+        r, l, t, b = w/2, -w/2, h/2, -h/2
+        vertices = [(l,b), (l,t), (r,t), (r,b), (0, 0), (l, b), (r, b)]
+        self.polyline = PolyLine(vertices, close=False)
+        self.polyline.attrs = [Color((1, 0, 0, 1)), self.transform]
+
+        # trace of vehicle (historical poses)
+        self.trace = deque(maxlen=max_trace_length)
+
+        self.reset()
+
+    def set_pose(self, pose):
+        # pose is a 3-dimensional vector (x, y, theta)
+        x, y, theta = pose[:3]
+        self.transform.set_translation(x, y)
+        self.transform.set_rotation(theta)
+
+        if self.keep_trace:
+            p = Point()
+            p.attrs = [Color((1, 0, 0, 1)), deepcopy(self.transform)]
+            self.trace.append(p)
+
+    def reset(self, pose=[0., 0., 0.]):
+        self.trace.clear()
+        self.set_pose(pose)
+
+    def render1(self):
+        self.polyline.render()
+        for p in self.trace:
+            p.render()
 
 class OffRoadScene(Interactable):
 

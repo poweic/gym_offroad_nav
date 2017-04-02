@@ -1,3 +1,5 @@
+import numpy as np
+
 RAD2DEG = 57.29577951308232
 
 def import_pyglet():
@@ -165,3 +167,76 @@ class LineWidth(Attr):
         self.stroke = stroke
     def enable(self):
         glLineWidth(self.stroke)
+
+class Image(Geom):
+
+    def __init__(self, img, center=(0., 0.), scale=1.0):
+        super(Image, self).__init__()
+        self.attrs = []
+
+        self.img = self.to_pyglet_image(img)
+
+        self.height = self.img.height
+        self.width = self.img.width
+        self.scale = scale
+
+        # center is default to the image center
+        self.center = (
+            -self.width  / 2 + center[0],
+            -self.height / 2 + center[1]
+        )
+
+        self.add_attr(Color((1, 1, 1, 1)))
+        self.flip = False
+
+    def to_pyglet_image(self, img):
+
+        import pyglet
+
+        if type(img) == str:
+            return pyglet.image.load(img)
+
+        height, width, channel = img.shape
+
+        if channel == 1:
+            img = np.repeat(img, 3, axis=-1)
+
+        if channel < 4:
+            img = np.concatenate([img, np.ones((height, width, 1), dtype=np.uint8) * 255], axis=-1)
+
+        image = pyglet.image.ImageData(
+            width, height, 'RGBA', img.tobytes(),
+            pitch= -width * 4
+        )
+
+        return image
+
+    def render1(self):
+        self.img.blit(
+            self.center[0] * self.scale, self.center[1] * self.scale,
+            width=self.width * self.scale, height=self.height * self.scale
+        )
+
+class ReferenceFrame(Geom):
+    def __init__(self, translation=(0.0, 0.0), rotation=0.0, scale=1.):
+        super(ReferenceFrame, self).__init__()
+        self.transform = Transform(
+            translation=translation, rotation=rotation, scale=(scale, scale)
+        )
+        self.add_attr(self.transform)
+        self.geoms = []
+        self.onetime_geoms = []
+
+    def add_geom(self, geom):
+        self.geoms.append(geom)
+
+    def add_onetime(self, geom):
+        self.onetime_geoms.append(geom)
+
+    def render1(self):
+        for g in self.geoms:
+            g.render()
+        for g in self.onetime_geoms:
+            g.render()
+        self.onetime_geoms = []
+

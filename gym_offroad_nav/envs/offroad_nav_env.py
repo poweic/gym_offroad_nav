@@ -150,8 +150,9 @@ class OffRoadNavEnv(gym.Env):
 
         return self._get_obs()
 
+    # All the rendering goes here...
     def _init_viewer(self):
-        from gym_offroad_nav.rendering.basic import Image, Viewer
+        from gym_offroad_nav.rendering import Image, Viewer
 
         # Alias for width, height, and scaling. Note that the scaling factor
         # s is used only for rendering, so it won't affect any underlying
@@ -169,7 +170,7 @@ class OffRoadNavEnv(gym.Env):
         ))
     
     def _init_local_frame(self):
-        from gym_offroad_nav.rendering.basic import ReferenceFrame
+        from gym_offroad_nav.rendering import ReferenceFrame
 
         self.local_frame = ReferenceFrame(
             translation=(self.viewer.width/2., 0),
@@ -177,7 +178,7 @@ class OffRoadNavEnv(gym.Env):
         )
 
     def _init_vehicles(self):
-        from gym_offroad_nav.rendering.basic import Vehicle
+        from gym_offroad_nav.interactable import Vehicle
 
         self.vehicles = [
             Vehicle(keep_trace=True)

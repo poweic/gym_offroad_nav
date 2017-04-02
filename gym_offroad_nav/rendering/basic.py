@@ -1,27 +1,17 @@
 from copy import deepcopy
-import pyglet
 import numpy as np
 from collections import deque
-from gym.envs.classic_control import rendering
+from gym_offroad_nav.rendering.core import (
+    import_pyglet, PolyLine, Color, Transform, Point, Geom, Viewer
+)
 
-Viewer = rendering.Viewer
-
-class Viewer(rendering.Viewer):
-    def __init__(self, width, height, display=None, scale=1.0):
-        width *= scale
-        height *= scale
-        super(Viewer, self).__init__(width=width, height=height, display=display)
-
-class Image(rendering.Geom):
+class Image(Geom):
 
     def __init__(self, img, center=(0., 0.), scale=1.0):
         super(Image, self).__init__()
         self.attrs = []
 
-        if type(img) == str:
-            self.img = pyglet.image.load(img)
-        else:
-            self.img = self.to_pyglet_image(img)
+        self.img = self.to_pyglet_image(img)
 
         self.height = self.img.height
         self.width = self.img.width
@@ -33,21 +23,26 @@ class Image(rendering.Geom):
             -self.height / 2 + center[1]
         )
 
-        self.add_attr(rendering.Color((1, 1, 1, 1)))
+        self.add_attr(Color((1, 1, 1, 1)))
         self.flip = False
 
-    def to_pyglet_image(self, ndarray):
+    def to_pyglet_image(self, img):
 
-        height, width, channel = ndarray.shape
+        import pyglet
+
+        if type(img) == str:
+            return pyglet.image.load(img)
+
+        height, width, channel = img.shape
 
         if channel == 1:
-            ndarray = np.repeat(ndarray, 3, axis=-1)
+            img = np.repeat(img, 3, axis=-1)
 
         if channel < 4:
-            ndarray = np.concatenate([ndarray, np.ones((height, width, 1), dtype=np.uint8) * 255], axis=-1)
+            img = np.concatenate([img, np.ones((height, width, 1), dtype=np.uint8) * 255], axis=-1)
 
         image = pyglet.image.ImageData(
-            width, height, 'RGBA', ndarray.tobytes(),
+            width, height, 'RGBA', img.tobytes(),
             pitch= -width * 4
         )
 
@@ -59,10 +54,10 @@ class Image(rendering.Geom):
             width=self.width * self.scale, height=self.height * self.scale
         )
 
-class ReferenceFrame(rendering.Geom):
+class ReferenceFrame(Geom):
     def __init__(self, translation=(0.0, 0.0), rotation=0.0, scale=1.):
         super(ReferenceFrame, self).__init__()
-        self.transform = rendering.Transform(
+        self.transform = Transform(
             translation=translation, rotation=rotation, scale=(scale, scale)
         )
         self.add_attr(self.transform)
@@ -82,7 +77,7 @@ class ReferenceFrame(rendering.Geom):
             g.render()
         self.onetime_geoms = []
 
-class Vehicle(rendering.Geom):
+class Vehicle(Geom):
     def __init__(self, size=2., keep_trace=False, max_trace_length=100):
         super(Vehicle, self).__init__()
 
@@ -90,14 +85,14 @@ class Vehicle(rendering.Geom):
         self.keep_trace = keep_trace
 
         # pose of vehicle (translation + rotation)
-        self.transform = rendering.Transform()
+        self.transform = Transform()
 
         # vertices of vehicles
         h, w = size, size / 2
         r, l, t, b = w/2, -w/2, h/2, -h/2
         vertices = [(l,b), (l,t), (r,t), (r,b), (0, 0), (l, b), (r, b)]
-        self.polyline = rendering.PolyLine(vertices, close=False)
-        self.polyline.attrs = [rendering.Color((1, 0, 0, 1)), self.transform]
+        self.polyline = PolyLine(vertices, close=False)
+        self.polyline.attrs = [Color((1, 0, 0, 1)), self.transform]
 
         # trace of vehicle (historical poses)
         self.trace = deque(maxlen=max_trace_length)
@@ -111,8 +106,8 @@ class Vehicle(rendering.Geom):
         self.transform.set_rotation(theta)
 
         if self.keep_trace:
-            p = rendering.Point()
-            p.attrs = [rendering.Color((1, 0, 0, 1)), deepcopy(self.transform)]
+            p = Point()
+            p.attrs = [Color((1, 0, 0, 1)), deepcopy(self.transform)]
             self.trace.append(p)
 
     def reset(self, pose=[0., 0., 0.]):

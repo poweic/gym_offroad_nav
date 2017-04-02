@@ -22,10 +22,7 @@ class OffRoadMap(object):
     def __init__(self, map_def):
 
         # Load map definition from YAML file and store values as self attributes
-        map_def = "{}/../maps/{}.yaml".format(dirname(__file__), map_def)
-        map_def = load_yaml(map_def)
-        for k, v in map_def.iteritems():
-            setattr(self, k, v)
+        self.load_map_def(map_def)
 
         self._init_boundary()
 
@@ -37,20 +34,31 @@ class OffRoadMap(object):
         # instead of passing map to every constructor.
         self.scene = OffRoadScene(map=self)
         self.static_objects = []
+
+        print "Creating coins ...",
         self.dynamic_objects = [
             Coin(map=map, position=(
                 np.random.randint(self.bounds.x_min * self.cell_size, self.bounds.x_max * self.cell_size),
                 np.random.randint(self.bounds.y_min * self.cell_size, self.bounds.y_max * self.cell_size)
             )) for _ in range(100)
         ]
+        print "done."
 
         self.interactables = [self.scene] + self.static_objects + self.dynamic_objects
 
         # cv2.imshow("rgb_map", self.rgb_map)
         # cv2.waitKey(500)
 
+    def load_map_def(self, map_def):
+        print "loading map ...",
+        map_def = "{}/../maps/{}.yaml".format(dirname(__file__), map_def)
+        map_def = load_yaml(map_def)
+        for k, v in map_def.iteritems():
+            setattr(self, k, v)
+        print "done."
+
     def colorize(self, labels):
-        print "colorizing ..."
+        print "colorizing ...",
         img = np.zeros((labels.shape[0], labels.shape[1], 3), dtype=np.uint8)
         classes = np.unique(labels)
         for c in classes:
@@ -59,7 +67,7 @@ class OffRoadMap(object):
         return img
 
     def cvt_map_structure_to_rewards(self, labels):
-        print "converting to reward ..."
+        print "converting to reward ...",
         rewards = np.zeros((labels.shape[0], labels.shape[1]), dtype=np.float32)
         classes = np.unique(labels)
         for c in classes:

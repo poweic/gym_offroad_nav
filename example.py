@@ -6,9 +6,7 @@ import numpy as np
 import time
 
 env = gym.make("OffRoadNav-v0")
-env.env._configure({
-    "n_agents_per_worker": 2
-})
+# env.env._configure({"n_agents_per_worker": 2})
 
 for i in range(100):
     env.reset()
@@ -18,3 +16,4 @@ for i in range(100):
         action = env.env.sample_action()
         state, reward, done, _ = env.step(action.squeeze())
         env.render()
+        # cv2.waitKey(0)

@@ -37,12 +37,15 @@ class Odometry(SensorModel):
         noise = self.rng.rand(*state.shape) * self.noise_level
         return (state * (1 + noise)).T
 
-def pad_image(img, padding, fill_value=None):
-    shape = (np.array(img.shape) + [padding * 2, padding * 2]).tolist()
+def pad_image(img, pad, fill_value=None):
+    if img.ndim == 2:
+        img = img[..., None]
+
+    shape = np.asarray(img.shape) + [pad * 2, pad * 2, 0]
     if fill_value is None:
         fill_value = np.min(img)
     padded_x = np.full(shape, fill_value, dtype=img.dtype)
-    padded_x[padding:-padding, padding:-padding] = img
+    padded_x[pad:-pad, pad:-pad] = img
     return padded_x
 
 # This sensor model return the front view of the vehicle as an image of shape
@@ -60,25 +63,53 @@ class FrontViewer(SensorModel):
             self.field_of_view
         )
 
-        """
         self.padded_rgb_map = pad_image(
             self.map.rgb_map,
             self.field_of_view
         )
-        """
 
         """
         cv2.imshow("padded_rewards", to_image(self.padded_rewards))
         cv2.waitKey(500)
         """
 
-    def get_padded_rewards(self):
-        return self.padded_rewards
-
-    def get_padded_rgb_map(self):
-        return self.padded_rgb_map
-
     def eval(self, state):
+        
+        cxs, cys, angles = self._get_cx_cy_angle(state)
+        n_agents = len(angles)
+
+        n_channels = 4
+
+        height, width = self.padded_rewards.shape[:2]
+        size = (width, height)
+        fov = self.field_of_view
+        print "fov = {}".format(fov)
+
+        images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
+        for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
+            M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
+            # print "[{}:{}, {}:{}]".format(cy-fov, cy, cx-fov/2, cx+fov/2)
+
+            rotated_rewards = cv2.warpAffine(self.padded_rewards, M, size)
+            rotated_rgb_map = cv2.warpAffine(self.padded_rgb_map, M, size)
+
+            images[i, :, :, 0 ] = rotated_rewards[cy-fov:cy, cx-fov/2:cx+fov/2]
+            images[i, :, :, 1:] = rotated_rgb_map[cy-fov:cy, cx-fov/2:cx+fov/2]
+
+        # visualization (for debugging purpose)
+        disp_img = np.zeros((2*fov, n_agents * fov, 3), dtype=np.uint8)
+        for i, img in enumerate(images):
+            disp_img[:fov, i*fov:(i+1)*fov] += (img[..., 0:1] * 255).astype(np.uint8)
+            disp_img[fov:, i*fov:(i+1)*fov] = img[..., -1:0:-1].astype(np.uint8)
+
+        # cv2.imshow("reward", images[0, ..., 0])
+        # cv2.imshow("rgb", images[0, ..., -1:0:-1].astype(np.uint8))
+        cv2.imshow("front_view", disp_img)
+        cv2.waitKey(5)
+
+        return images
+
+    def _get_cx_cy_angle(self, state):
         x, y, theta = state[:3]
 
         ix, iy = self.map.get_ixiy(x, y)
@@ -87,24 +118,10 @@ class FrontViewer(SensorModel):
         iiy = np.clip(self.map.bounds.y_max - 1 - iy, 0, self.map.height - 1)
 
         fov = self.field_of_view
-
         cxs, cys = iix + fov, iiy + fov
-
         angles = -theta * RAD2DEG
 
-        padded_rewards = self.get_padded_rewards()
-
-        img = np.zeros((len(angles), fov, fov), dtype=np.float32)
-        for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
-            M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
-            rotated = cv2.warpAffine(padded_rewards, M, padded_rewards.T.shape)
-            # print "[{}:{}, {}:{}]".format(cy-fov, cy, cx-fov/2, cx+fov/2)
-            img[i, :, :] = rotated[cy-fov:cy, cx-fov/2:cx+fov/2]
-
-        # cv2.imshow("front_view", img[0])
-        # cv2.waitKey(5)
-
-        return img[..., None]
+        return cxs, cys, angles
 
 class Lidar(SensorModel):
     def __init__(self):

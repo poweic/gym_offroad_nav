@@ -1,12 +1,17 @@
 from gym_offroad_nav.rendering import ReferenceFrame
 
+def assert_int(x, msg):
+    assert int(x) == x, msg
+
 class Viewer(object):
-    def __init__(self, map, viewport_scale):
-        self.map = map
-        self.viewport_scale = viewport_scale
+    def __init__(self, env):
+        self.env = env
+        self.viewport_scale = env.opts.viewport_scale
+
+        assert_int(self.viewport_scale, "viewport_scale must be integer, not float")
 
         self.local_frame = ReferenceFrame(
-            scale=viewport_scale / self.map.cell_size
+            scale=self.viewport_scale / env.map.cell_size
         )
 
         self.viewer = None
@@ -19,6 +24,8 @@ class Viewer(object):
             self._init_viewer()
 
         self.viewer.render()
+        for sensor in self.env.sensors.itervalues():
+            sensor.render()
 
     def close(self):
         if self.viewer is not None:
@@ -32,15 +39,14 @@ class Viewer(object):
         # Alias for width, height, and scaling. Note that the scaling factor
         # s is used only for rendering, so it won't affect any underlying
         # simulation. Just like zooming in/out the GUI and that's all.
-        w, h, s = self.map.width, self.map.height, self.viewport_scale
-        assert int(s) == s, "viewport_scale must be integer, not float"
+        w, h, s = self.env.map.width, self.env.map.height, self.viewport_scale
 
         # Create viewer
         self.viewer = Viewer(width=w, height=h, scale=s)
 
         # Convert reward to uint8 image (by normalizing) and add as background
         self.viewer.add_geom(Image(
-            img=self.map.rgb_map,
+            img=self.env.map.rgb_map,
             center=(w/2, h/2), scale=s
         ))
 

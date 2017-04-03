@@ -76,7 +76,7 @@ class OffRoadNavEnv(gym.Env):
         ))
 
         # Rendering
-        self.viewer = Viewer(self.map, self.opts.viewport_scale)
+        self.viewer = Viewer(self)
 
         self.init_agents()
 

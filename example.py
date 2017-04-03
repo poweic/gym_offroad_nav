@@ -12,9 +12,12 @@ for i in range(100):
     env.reset()
     done = False
 
+    total_return = 0
+
     while not np.any(done):
         action = env.env.sample_action()
         state, reward, done, _ = env.step(action.squeeze())
-        print "reward = ({:8.0f}, {:8.0f})".format(reward[0, 0], reward[0, 1])
+        total_return = total_return + reward.squeeze()
+        print "total_return = ({:4.0f}, {:4.0f})".format(total_return[0], total_return[1])
         env.render()
-        # cv2.waitKey(0)
+        cv2.waitKey(0)

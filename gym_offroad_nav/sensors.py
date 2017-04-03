@@ -24,6 +24,10 @@ class SensorModel(object):
     def eval(self, state):
         pass
 
+    @abc.abstractmethod
+    def render(self):
+        pass
+
 # odometry is also a sensor. The vehicle model is assumed to be perfect and 
 # calculates how vehicle should move according to the laws of physics. We use
 # odometry to measure how vehicle really move. If noise_level is 0, then this
@@ -36,6 +40,10 @@ class Odometry(SensorModel):
         # Add some noise using state * (1 + noise) instead of state + noise
         noise = self.rng.rand(*state.shape) * self.noise_level
         return (state * (1 + noise)).T
+
+    def render(self):
+        # should render the trace of vehicle here
+        pass
 
 def pad_image(img, pad, fill_value=None):
     if img.ndim == 2:
@@ -68,6 +76,8 @@ class FrontViewer(SensorModel):
             self.field_of_view
         )
 
+        self.images = None
+
     def eval(self, state):
         
         cxs, cys, angles = self._get_cx_cy_angle(state)
@@ -95,9 +105,27 @@ class FrontViewer(SensorModel):
             images[i, ..., 1:4] = cv2.warpAffine(C, M, size)[sy, sx]
             images[i, ..., 4  ] = cv2.warpAffine(W, M, size)[sy, sx]
 
-        # self._visualize(images)
+        self.images = images
 
         return images
+
+    def render(self):
+
+        if self.images is None:
+            return
+
+        n_agents, h, w = self.images.shape[:3]
+
+        # visualization (for debugging purpose)
+        disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.uint8)
+        for i, img in enumerate(self.images):
+            s = slice(i*w, (i+1)*w)
+            disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
+            disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]]).astype(np.uint8)
+            disp_img[2*h:3*h, s] += (img[..., 4:5] * 255).astype(np.uint8)
+
+        cv2.imshow("front_view", disp_img)
+        cv2.waitKey(1)
 
     def _get_padded_waypoint_map(self):
 
@@ -106,14 +134,16 @@ class FrontViewer(SensorModel):
         fov = self.field_of_view
 
         for obj in self.map.dynamic_objects:
+
+            # TODO check whether the waypoint is still valid, but this means
+            # we need to create separate waypoint map for each agent ...
+            # if not obj.valid: continue
+
             # draw coin the this numpy ndarray, need to convert
             ix, iy = self.map.get_ixiy(*obj.position)
             x, y = ix - bounds.x_min, bounds.y_max - 1 - iy
             cv2.circle(m, (x+fov, y+fov), color=(1, 1, 1), thickness=-1,
                        radius=int(obj.radius / self.map.cell_size))
-
-        # cv2.imshow("waypoint", m)
-        # cv2.waitKey(1)
 
         return m
 
@@ -131,22 +161,6 @@ class FrontViewer(SensorModel):
 
         return cxs, cys, angles
 
-    def _visualize(self, images):
-
-        n_agents, h, w = images.shape[:3]
-
-        # visualization (for debugging purpose)
-        disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.uint8)
-        for i, img in enumerate(images):
-            s = slice(i*w, (i+1)*w)
-            disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
-            disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]]).astype(np.uint8)
-            disp_img[2*h:3*h, s] += (img[..., 4:5] * 255).astype(np.uint8)
-
-        # cv2.imshow("reward", images[0, ..., 0])
-        # cv2.imshow("rgb", images[0, ..., -1:0:-1].astype(np.uint8))
-        cv2.imshow("front_view", disp_img)
-        cv2.waitKey(5)
 
 class Lidar(SensorModel):
     def __init__(self):

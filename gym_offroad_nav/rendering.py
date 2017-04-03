@@ -142,6 +142,23 @@ class Transform(Attr):
     def set_scale(self, newx, newy):
         self.scale = (float(newx), float(newy))
 
+class Transform2D(Attr):
+    def __init__(self, pose):
+        self.pose = pose
+    def enable(self):
+        glPushMatrix()
+        glTranslatef(self.pose[0], self.pose[1], 0)
+        glRotatef(RAD2DEG * self.pose[2], 0, 0, 1.0)
+    def disable(self):
+        glPopMatrix()
+    def set_pose(self, pose):
+        self.pose[:] = pose[:]
+    def set_translation(self, newx, newy):
+        self.pose[0] = float(newx)
+        self.pose[1] = float(newy)
+    def set_rotation(self, new):
+        self.pose[2] = float(new)
+
 class Color(Attr):
     def __init__(self, vec4):
         self.vec4 = vec4

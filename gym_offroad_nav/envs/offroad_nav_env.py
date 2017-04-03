@@ -28,7 +28,14 @@ class OffRoadNavEnv(gym.Env):
         self.opts.update(opts)
         self.initialize()
 
+    def __setattr__(self, name, value):
+        if name == "state" and self.initialized:
+            raise AttributeError("state is immutable once it's initialized.")
+        else:
+            return super(OffRoadNavEnv, self).__setattr__(name, value)
+
     def initialize(self):
+        self.initialized = False
 
         # Load map definition from YAML file from configuration file
         self.map = OffRoadMap(self.opts.map_def)
@@ -48,7 +55,7 @@ class OffRoadNavEnv(gym.Env):
             self.opts.timestep, self.opts.wheelbase, self.opts.drift
         )
 
-        self.state = None
+        self.state = np.zeros((6, self.opts.n_agents_per_worker), dtype=np.float32)
 
         # action space = forward velocity + steering angle
         self.action_space = spaces.Box(
@@ -78,6 +85,8 @@ class OffRoadNavEnv(gym.Env):
 
         self.rng = np.random.RandomState()
 
+        self.initialized = True
+
     def sample_action(self):
         return np.concatenate([
             self.action_space.sample()[:, None]
@@ -106,13 +115,14 @@ class OffRoadNavEnv(gym.Env):
 
         Returns
         -------
-        Tuple
-            A 4-element tuple (state, reward, done, info)
+        A 4-element tuple (state, reward, done, info)
         '''
         action = action.reshape(self.dof, self.opts.n_agents_per_worker)
         n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
+        state = self.state.copy()
         for j in range(n_sub_steps):
-            self.state = self.vehicle_model.predict(self.state, action)
+            state = self.vehicle_model.predict(state, action)
+        self.state[:] = state[:]
 
         # Y forward, X lateral
         x, y = self.state[:2]
@@ -128,7 +138,6 @@ class OffRoadNavEnv(gym.Env):
         return self._get_obs(), reward, done, info
 
     def get_initial_state(self):
-        # state = np.array([+1, 1, -10 * np.pi / 180, 0, 0, 0])
         state = np.array(self.map.initial_pose)
 
         # Reshape to compatiable format
@@ -146,8 +155,8 @@ class OffRoadNavEnv(gym.Env):
         from gym_offroad_nav.interactable import Vehicle
 
         self.vehicles = [
-            Vehicle(keep_trace=True)
-            for _ in range(self.opts.n_agents_per_worker)
+            Vehicle(pose=self.state.T[i], keep_trace=True)
+            for i in range(self.opts.n_agents_per_worker)
         ]
 
         for vehicle in self.vehicles:
@@ -158,12 +167,9 @@ class OffRoadNavEnv(gym.Env):
         self.vehicle_model.reset(s0)
         # self.vehicle_model_gpu.reset(s0)
 
-        self.state = s0.copy()
+        self.state[:] = s0[:]
 
         if self.viewer.initialized():
-            for vehicle, state in zip(self.vehicles, self.state.T):
-                vehicle.reset(state)
-
             for obj in self.map.dynamic_objects:
                 obj.reset()
 
@@ -174,10 +180,5 @@ class OffRoadNavEnv(gym.Env):
         if close:
             self.viewer.close()
             return
-
-        self.viewer.initialize()
-
-        for vehicle, state in zip(self.vehicles, self.state.T):
-            vehicle.set_pose(state)
 
         self.viewer.render()

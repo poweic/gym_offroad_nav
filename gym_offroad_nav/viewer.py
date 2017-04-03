@@ -11,16 +11,13 @@ class Viewer(object):
 
         self.viewer = None
 
-    def initialize(self):
-        if self.initialized():
-            return
-
-        self._init_viewer()
-
     def initialized(self):
         return self.viewer is not None
 
     def render(self):
+        if self.viewer is None:
+            self._init_viewer()
+
         self.viewer.render()
 
     def close(self):

@@ -36,13 +36,13 @@ class StaticObject(Interactable):
 
 class Coin(Interactable, rendering.Geom):
 
-    def __init__(self, position, radius=2., reward=100., **kwargs):
+    def __init__(self, position, radius=2., reward=10., **kwargs):
         Interactable.__init__(self, **kwargs)
         rendering.Geom.__init__(self, **kwargs)
 
         self.position = np.array([position]).T
-        self.radius = radius
-        self.reward = reward
+        self.radius = float(radius)
+        self.reward = float(reward)
 
         self.transform = rendering.Transform(translation=position)
         color = rendering.Color((247./255, 223./255, 56./255, 0.9))
@@ -70,14 +70,14 @@ class Coin(Interactable, rendering.Geom):
         self.coin_radius.render()
 
 class Vehicle(rendering.Geom):
-    def __init__(self, size=2., keep_trace=False, max_trace_length=100):
+    def __init__(self, pose, size=2., keep_trace=False, max_trace_length=100):
         super(Vehicle, self).__init__()
 
         self.size = size
         self.keep_trace = keep_trace
 
         # pose of vehicle (translation + rotation)
-        self.transform = rendering.Transform()
+        self.transform = rendering.Transform2D(pose=pose[:3])
 
         # vertices of vehicles
         h, w = size, size / 2
@@ -91,11 +91,15 @@ class Vehicle(rendering.Geom):
 
         self.reset()
 
+    def __setattr__(self, name, value):
+        if name == "pose":
+            raise AttributeError("Pose is immutable, please call set_pose()")
+        else:
+            return super(Vehicle, self).__setattr__(name, value)
+
     def set_pose(self, pose):
-        # pose is a 3-dimensional vector (x, y, theta)
-        x, y, theta = pose[:3]
-        self.transform.set_translation(x, y)
-        self.transform.set_rotation(theta)
+        # pose is a 6-dimensional vector (x, y, theta, x', y', theta')
+        self.transform.set_pose(pose[:3])
 
         if self.keep_trace:
             p = rendering.Point()

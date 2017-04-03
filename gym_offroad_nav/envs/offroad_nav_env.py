@@ -13,6 +13,7 @@ from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
+from gym_offroad_nav.viewer import Viewer
 
 class OffRoadNavEnv(gym.Env):
     metadata = {
@@ -21,7 +22,6 @@ class OffRoadNavEnv(gym.Env):
 
     def __init__(self):
         self.opts = get_options_from_TF_flags()
-
         self.initialize()
 
     def _configure(self, opts):
@@ -64,12 +64,17 @@ class OffRoadNavEnv(gym.Env):
 
         # TODO observation_space should be automatically deduced from sensors
         self.observation_space = spaces.Tuple((
-            spaces.Box(low=0, high=255, shape=(fov, fov, 1)),
+            spaces.Box(low=0, high=255, shape=(fov, fov, 5)),
             spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
 
         # Rendering
-        self.viewer = None
+        self.viewer = Viewer(self.map, self.opts.viewport_scale)
+
+        self.init_agents()
+
+        for obj in self.map.dynamic_objects:
+            self.viewer.add(obj)
 
         self.rng = np.random.RandomState()
 
@@ -137,50 +142,7 @@ class OffRoadNavEnv(gym.Env):
 
         return state
 
-    def _reset(self):
-        s0 = self.get_initial_state()
-        self.vehicle_model.reset(s0)
-        # self.vehicle_model_gpu.reset(s0)
-
-        self.state = s0.copy()
-
-        if self.viewer:
-            for vehicle, state in zip(self.vehicles, self.state.T):
-                vehicle.reset(state)
-
-            for obj in self.map.dynamic_objects:
-                obj.reset()
-
-        return self._get_obs()
-
-    # All the rendering goes here...
-    def _init_viewer(self):
-        from gym_offroad_nav.rendering import Image, Viewer
-
-        # Alias for width, height, and scaling. Note that the scaling factor
-        # s is used only for rendering, so it won't affect any underlying
-        # simulation. Just like zooming in/out the GUI and that's all.
-        w, h, s = self.map.width, self.map.height, self.opts.viewport_scale
-        assert int(s) == s, "viewport_scale must be integer, not float"
-
-        # Create viewer
-        self.viewer = Viewer(width=w, height=h, scale=s)
-
-        # Convert reward to uint8 image (by normalizing) and add as background
-        self.viewer.add_geom(Image(
-            img=self.map.rgb_map,
-            center=(w/2, h/2), scale=s
-        ))
-    
-    def _init_local_frame(self):
-        from gym_offroad_nav.rendering import ReferenceFrame
-
-        self.local_frame = ReferenceFrame(
-            translation=(self.viewer.width/2., 0),
-            scale=self.opts.viewport_scale / self.map.cell_size
-        )
-
-    def _init_vehicles(self):
+    def init_agents(self):
         from gym_offroad_nav.interactable import Vehicle
 
         self.vehicles = [
@@ -189,27 +151,31 @@ class OffRoadNavEnv(gym.Env):
         ]
 
         for vehicle in self.vehicles:
-            self.local_frame.add_geom(vehicle)
+            self.viewer.add(vehicle)
 
-    def _init_rendering(self):
-        if self.viewer is None:
-            self._init_viewer()
-            self._init_local_frame()
-            self._init_vehicles()
-            self.viewer.add_geom(self.local_frame)
+    def _reset(self):
+        s0 = self.get_initial_state()
+        self.vehicle_model.reset(s0)
+        # self.vehicle_model_gpu.reset(s0)
+
+        self.state = s0.copy()
+
+        if self.viewer.initialized():
+            for vehicle, state in zip(self.vehicles, self.state.T):
+                vehicle.reset(state)
 
             for obj in self.map.dynamic_objects:
-                self.local_frame.add_geom(obj)
+                obj.reset()
+
+        return self._get_obs()
 
     def _render(self, mode='human', close=False):
 
         if close:
-            if self.viewer is not None:
-                self.viewer.close()
-                self.viewer = None
+            self.viewer.close()
             return
 
-        self._init_rendering()
+        self.viewer.initialize()
 
         for vehicle, state in zip(self.vehicles, self.state.T):
             vehicle.set_pose(state)

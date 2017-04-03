@@ -73,11 +73,15 @@ class FrontViewer(SensorModel):
         cxs, cys, angles = self._get_cx_cy_angle(state)
         n_agents = len(angles)
 
-        height, width = self.padded_rewards.shape[:2]
+        R = self.padded_rewards
+        C = self.padded_rgb_map
+        W = self._get_padded_waypoint_map()
+
+        height, width = R.shape[:2]
         size = (width, height)
         fov = self.field_of_view
 
-        n_channels = 4
+        n_channels = 5
         images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
 
         for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
@@ -87,12 +91,31 @@ class FrontViewer(SensorModel):
             sx = slice(cx-fov/2, cx+fov/2)
             sy = slice(cy-fov, cy)
 
-            images[i, ..., 0 ] = cv2.warpAffine(self.padded_rewards, M, size)[sy, sx]
-            images[i, ..., 1:] = cv2.warpAffine(self.padded_rgb_map, M, size)[sy, sx]
+            images[i, ..., 0  ] = cv2.warpAffine(R, M, size)[sy, sx]
+            images[i, ..., 1:4] = cv2.warpAffine(C, M, size)[sy, sx]
+            images[i, ..., 4  ] = cv2.warpAffine(W, M, size)[sy, sx]
 
-        self._visualize(images)
+        # self._visualize(images)
 
         return images
+
+    def _get_padded_waypoint_map(self):
+
+        m = np.zeros_like(self.padded_rewards)
+        bounds = self.map.bounds
+        fov = self.field_of_view
+
+        for obj in self.map.dynamic_objects:
+            # draw coin the this numpy ndarray, need to convert
+            ix, iy = self.map.get_ixiy(*obj.position)
+            x, y = ix - bounds.x_min, bounds.y_max - 1 - iy
+            cv2.circle(m, (x+fov, y+fov), color=(1, 1, 1), thickness=-1,
+                       radius=int(obj.radius / self.map.cell_size))
+
+        # cv2.imshow("waypoint", m)
+        # cv2.waitKey(1)
+
+        return m
 
     def _get_cx_cy_angle(self, state):
         x, y, theta = state[:3]
@@ -110,14 +133,15 @@ class FrontViewer(SensorModel):
 
     def _visualize(self, images):
 
-        n_agents, height, width = images.shape[:3]
+        n_agents, h, w = images.shape[:3]
 
         # visualization (for debugging purpose)
-        disp_img = np.zeros((2*height, n_agents*width, 3), dtype=np.uint8)
+        disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.uint8)
         for i, img in enumerate(images):
-            s = slice(i*width, (i+1)*width)
-            disp_img[:height, s] += (img[..., 0:1] * 255).astype(np.uint8)
-            disp_img[height:, s] = img[..., -1:0:-1].astype(np.uint8)
+            s = slice(i*w, (i+1)*w)
+            disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
+            disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]]).astype(np.uint8)
+            disp_img[2*h:3*h, s] += (img[..., 4:5] * 255).astype(np.uint8)
 
         # cv2.imshow("reward", images[0, ..., 0])
         # cv2.imshow("rgb", images[0, ..., -1:0:-1].astype(np.uint8))

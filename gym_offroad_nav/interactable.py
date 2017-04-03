@@ -57,8 +57,9 @@ class Coin(Interactable, rendering.Geom):
     def react(self, state):
         distance = np.linalg.norm(state[:2] - self.position, axis=0)
         inside = (distance <= self.radius)
+        r = self.reward * (inside & self.valid)
         self.valid &= ~inside
-        return self.reward * inside
+        return r
 
     def reset(self):
         self.valid = True

@@ -34,14 +34,13 @@ class OffRoadMap(object):
         # instead of passing map to every constructor.
         self.scene = OffRoadScene(map=self)
         self.static_objects = []
+        self.dynamic_objects = []
 
-        print "Creating coins ...",
-        self.dynamic_objects = [
-            Coin(map=map, position=(
-                np.random.randint(self.bounds.x_min * self.cell_size, self.bounds.x_max * self.cell_size),
-                np.random.randint(self.bounds.y_min * self.cell_size, self.bounds.y_max * self.cell_size)
-            )) for _ in range(100)
-        ]
+        print "Creating waypoints ...",
+        self.dynamic_objects.extend([
+            Coin(map=map, position=waypoint, radius=self.waypoint_radius,
+                 reward=self.waypoint_score) for waypoint in self.waypoints
+        ])
         print "done."
 
         self.interactables = [self.scene] + self.static_objects + self.dynamic_objects

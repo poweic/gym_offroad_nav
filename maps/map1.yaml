@@ -1,6 +1,6 @@
 cell_size: 0.25
 class_id_to_class_name: {0: void, 1: smooth trail, 2: 'low vegetation (traversable, drive cautiously, despite geometry)', 3: slow down, 4: 'water (not traversable, despite geometry)', 5: obstacles (non traversable), 6: bushes (non traversable), 7: tree (non traversable)}
-class_id_to_rewards: [0.0, 1.0, -1.0, 0.8, 0.4, -20.0, -10.0, -20.0]
+class_id_to_rewards: [0.0, 1.0, -0.1, 0.8, 0.4, -200.0, -100.0, -200.0]
 class_id_to_rgb:
   0: [255, 255, 255]
   1: [178, 176, 153]
@@ -15,7 +15,9 @@ waypoint_radius: 2.
 waypoint_score: 10.
 waypoints:
 - [-30, 20]
-- [-30, 31.5]
+- [-32.5, 24.5]
+- [-32, 29]
+- [-28.5, 31.5]
 - [-20, 31]
 - [-10, 30.5]
 - [  0, 31.8]

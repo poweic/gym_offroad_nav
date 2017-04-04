@@ -87,6 +87,9 @@ class OffRoadNavEnv(gym.Env):
 
         self.initialized = True
 
+        self.timer = 0
+        self.counter = 0
+
     def sample_action(self):
         return np.concatenate([
             self.action_space.sample()[:, None]
@@ -117,6 +120,7 @@ class OffRoadNavEnv(gym.Env):
         -------
         A 4-element tuple (state, reward, done, info)
         '''
+        # self.timer -= time()
         action = action.reshape(self.dof, self.opts.n_agents_per_worker)
         n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
         state = self.state.copy()
@@ -133,9 +137,14 @@ class OffRoadNavEnv(gym.Env):
         # debug info
         info = {}
 
-        self.prev_action = action.copy()
+        self.obs = self._get_obs()
 
-        return self._get_obs(), reward, done, info
+        self.prev_action = action.copy()
+        # self.timer += time()
+        # self.counter += 1
+        # print "Took {} ms".format(self.timer / self.counter * 1000)
+
+        return self.obs, reward, done, info
 
     def get_initial_state(self):
         state = np.array(self.map.initial_pose)
@@ -145,7 +154,7 @@ class OffRoadNavEnv(gym.Env):
 
         # Add some noise to have diverse start points
         noise = self.rng.randn(6, self.opts.n_agents_per_worker).astype(np.float32) * 0.5
-        noise[2, :] /= 2
+        noise[2, :] /= 10
 
         state = state + noise
 

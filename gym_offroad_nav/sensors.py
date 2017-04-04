@@ -1,6 +1,7 @@
 import cv2
 import abc
 import numpy as np
+import time
 from gym_offroad_nav.utils import to_image
 
 RAD2DEG = 180. / np.pi
@@ -78,6 +79,9 @@ class FrontViewer(SensorModel):
 
         self.images = None
 
+        self.timer = 0
+        self.counter = 0
+
     def eval(self, state):
         
         cxs, cys, angles = self._get_cx_cy_angle(state)
@@ -94,6 +98,7 @@ class FrontViewer(SensorModel):
         n_channels = 5
         images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
 
+        # self.timer -= time.time()
         for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
             # print "[{}:{}, {}:{}]".format(cy-fov, cy, cx-fov/2, cx+fov/2)
             M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
@@ -104,6 +109,10 @@ class FrontViewer(SensorModel):
             images[i, ..., 0  ] = cv2.warpAffine(R, M, size)[sy, sx]
             images[i, ..., 1:4] = cv2.warpAffine(C, M, size)[sy, sx]
             images[i, ..., 4  ] = cv2.warpAffine(W, M, size)[sy, sx]
+        # self.timer += time.time()
+        # self.counter += 1
+
+        # print "Took {} ms".format(self.timer / self.counter * 1000)
 
         self.images = images
 
@@ -129,6 +138,9 @@ class FrontViewer(SensorModel):
 
     def _get_padded_waypoint_map(self):
 
+        if hasattr(self, 'padded_waypoint_map'):
+            return self.padded_waypoint_map
+
         m = np.zeros_like(self.padded_rewards)
         bounds = self.map.bounds
         fov = self.field_of_view
@@ -144,6 +156,8 @@ class FrontViewer(SensorModel):
             x, y = ix - bounds.x_min, bounds.y_max - 1 - iy
             cv2.circle(m, (x+fov, y+fov), color=(1, 1, 1), thickness=-1,
                        radius=int(obj.radius / self.map.cell_size))
+
+        self.padded_waypoint_map = m
 
         return m
 

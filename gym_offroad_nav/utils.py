@@ -30,17 +30,17 @@ def clip(x, minimum, maximum):
 def get_options_from_TF_flags():
 
     options = AttrDict({
-        'field_of_view': 40,
+        'field_of_view': 32,
         'min_mu_vf':  6. / 3.6,
         'max_mu_vf': 14. / 3.6,
         'min_mu_steer': -30 * np.pi / 180,
         'max_mu_steer': +30 * np.pi / 180,
-        'timestep': 0.0025,
+        'timestep': 0.025,
         'odom_noise_level': 0.02,
         'wheelbase': 2.0,
-        'map_def': 'map1',
+        'map_def': 'map2',
         'command_freq': 5,
-        'n_agents_per_worker': 2,
+        'n_agents_per_worker': 16,
         'viewport_scale': 4,
         'drift': False
     })

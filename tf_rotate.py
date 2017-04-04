@@ -2,10 +2,12 @@
 import cv2
 import numpy as np
 import tensorflow as tf
+from time import time
 
 def main():
 
-    data = cv2.imread("space-x.jpg")
+    data = cv2.imread("space-x.jpg")[:32, :32, :]
+    data = np.concatenate([data for _ in range(27)], axis=-1)
     print data.shape
 
     image = tf.placeholder(tf.float32, data.shape, "image")
@@ -15,14 +17,21 @@ def main():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        for i in np.linspace(0, 360, 3600):
+        timer = 0
+        N = 360
+        for i in np.linspace(0, 360, N):
+            timer -= time()
             result = sess.run(rotated, feed_dict={
                 image: data.astype(np.float32),
                 angle: i
             }).astype(np.uint8)
+            timer += time()
 
-            cv2.imshow("result", result)
+            print result.shape
+            cv2.imshow("result", result[..., :3])
             cv2.waitKey(1)
+
+        print "took {:.2f} ms for each rotation".format(timer / N * 1000)
 
 def rotate(image, angle, center=None):
     with tf.name_scope('rotate'):

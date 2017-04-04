@@ -16,6 +16,7 @@ for i in range(100):
 
     while not np.any(done):
         action = env.env.sample_action()
+        action[0] *= np.arange(len(action[0]))
         state, reward, done, _ = env.step(action.squeeze())
         total_return = total_return + reward.squeeze()
         print "total_return = ({:4.0f}, {:4.0f})".format(total_return[0], total_return[1])

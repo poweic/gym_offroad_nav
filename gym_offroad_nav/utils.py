@@ -40,7 +40,7 @@ def get_options_from_TF_flags():
         'wheelbase': 2.0,
         'map_def': 'map2',
         'command_freq': 5,
-        'n_agents_per_worker': 16,
+        'n_agents_per_worker': 4,
         'viewport_scale': 4,
         'drift': False
     })

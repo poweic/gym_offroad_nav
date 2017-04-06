@@ -31,6 +31,7 @@ def get_options_from_TF_flags():
 
     options = AttrDict({
         'field_of_view': 32,
+        'downsample': 2,
         'min_mu_vf':  6. / 3.6,
         'max_mu_vf': 14. / 3.6,
         'min_mu_steer': -30 * np.pi / 180,
@@ -49,7 +50,8 @@ def get_options_from_TF_flags():
         import tensorflow as tf
         for key in options.keys():
             options[key] = getattr(tf.flags.FLAGS, key, options[key])
-    except:
+    except Exception as e:
+        print e
         pass
 
     return options

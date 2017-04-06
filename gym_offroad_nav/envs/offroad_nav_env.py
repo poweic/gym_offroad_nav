@@ -47,7 +47,9 @@ class OffRoadNavEnv(gym.Env):
         # the simplest front view sensor
         self.sensors = {
             'vehicle_state': Odometry(self.opts.odom_noise_level),
-            'front_view': FrontViewer(self.map, self.opts.field_of_view)
+            'front_view': FrontViewer(
+                self.map, self.opts.field_of_view, self.opts.downsample
+            )
         }
 
         # self.vehicle_model_gpu = VehicleModelGPU(...)
@@ -64,16 +66,15 @@ class OffRoadNavEnv(gym.Env):
         )
         self.dof = np.prod(self.action_space.shape)
 
-        # Observation space = front view (image) + vehicle state (6-dim vector)
-        fov = self.opts.field_of_view
-        float_min = np.finfo(np.float32).min
-        float_max = np.finfo(np.float32).max
-
-        # TODO observation_space should be automatically deduced from sensors
+        # observation_space is automatically deduced from sensors
         self.observation_space = spaces.Tuple((
-            spaces.Box(low=0, high=255, shape=(fov, fov, 5)),
-            spaces.Box(low=float_min, high=float_max, shape=(6, 1))
+            self.sensors['front_view'].get_obs_space(),
+            self.sensors['vehicle_state'].get_obs_space(),
+            # spaces.Box(low=0, high=255, shape=(fov, fov, 5)),
+            # spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
+
+        print self.observation_space
 
         # Rendering
         self.viewer = Viewer(self)

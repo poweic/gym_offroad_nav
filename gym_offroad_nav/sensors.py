@@ -3,8 +3,11 @@ import abc
 import numpy as np
 import time
 from gym_offroad_nav.utils import to_image
+from gym import spaces
 
 RAD2DEG = 180. / np.pi
+FLOAT_MIN = np.finfo(np.float32).min
+FLOAT_MAX = np.finfo(np.float32).max
 
 # Every sensor is by definition noisy, by setting noise_level to 0 (default)
 # the sensor is noise-free.
@@ -46,6 +49,9 @@ class Odometry(SensorModel):
         # should render the trace of vehicle here
         pass
 
+    def get_obs_space(self):
+        return spaces.Box(low=FLOAT_MIN, high=FLOAT_MAX, shape=(6, 1))
+
 def pad_image(img, pad, fill_value=None):
     if img.ndim == 2:
         img = img[..., None]
@@ -60,11 +66,12 @@ def pad_image(img, pad, fill_value=None):
 # This sensor model return the front view of the vehicle as an image of shape
 # fov x fov, where fov is the field of view (how far you see).
 class FrontViewer(SensorModel):
-    def __init__(self, map, field_of_view, noise_level=0):
+    def __init__(self, map, field_of_view, downsample, noise_level=0):
         super(FrontViewer, self).__init__(noise_level)
 
         self.map = map
         self.field_of_view = field_of_view
+        self.downsample = float(downsample)
         self.noise_level = noise_level
 
         self.padded_rewards = pad_image(
@@ -112,11 +119,34 @@ class FrontViewer(SensorModel):
         # self.timer += time.time()
         # self.counter += 1
 
-        # print "Took {} ms".format(self.timer / self.counter * 1000)
+        # downsample the image
+        images = self.resize(images)
 
         self.images = images
 
         return images
+
+    def resize(self, images):
+        n_agents, fov, fov, n_channels = images.shape
+        out_shape = self.get_output_shape()[:2]
+
+        images = images.transpose([1,2,3,0]).reshape(fov, fov, -1)
+
+        images = cv2.resize(images, out_shape, interpolation=cv2.INTER_AREA)
+
+        images = images.reshape(out_shape[0], out_shape[1], n_channels, -1)
+
+        images = images.transpose([3, 0, 1, 2])
+
+        return images
+
+    def get_output_shape(self):
+        m = int(self.field_of_view / self.downsample)
+        return (m, m, 5)
+
+    def get_obs_space(self):
+        return spaces.Box(low=FLOAT_MIN, high=FLOAT_MAX,
+                          shape=self.get_output_shape())
 
     def render(self):
 

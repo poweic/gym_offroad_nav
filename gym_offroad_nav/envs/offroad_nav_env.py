@@ -8,7 +8,7 @@ from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
 
-from gym_offroad_nav.utils import get_options_from_TF_flags, AttrDict
+from gym_offroad_nav.utils import get_options_from_TF_flags, AttrDict, Timer
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
@@ -88,8 +88,11 @@ class OffRoadNavEnv(gym.Env):
 
         self.initialized = True
 
-        self.timer = 0
-        self.counter = 0
+        self.timer = AttrDict(
+            vehicle_model=Timer("vehicle_model"),
+            get_obs=Timer("get_obs"),
+            others=Timer("contains + reward")
+        )
 
     def sample_action(self):
         return np.concatenate([
@@ -121,29 +124,35 @@ class OffRoadNavEnv(gym.Env):
         -------
         A 4-element tuple (state, reward, done, info)
         '''
-        # self.timer -= time()
+        self.timer.vehicle_model.tic()
         action = action.reshape(self.dof, self.opts.n_agents_per_worker)
         n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
         state = self.state.copy()
         for j in range(n_sub_steps):
             state = self.vehicle_model.predict(state, action)
         self.state[:] = state[:]
+        self.timer.vehicle_model.toc()
+
+        # compute reward and determine whether it's done
+        self.timer.others.tic()
+        reward = self.rewarder.eval(self.state)
+        self.total_reward += reward
 
         # Y forward, X lateral
         x, y = self.state[:2]
         done = ~self.map.contains(x, y)
+        done |= (self.total_reward < self.map.minimum_score).squeeze()
 
-        reward = self.rewarder.eval(self.state)
+        self.timer.others.toc()
 
         # debug info
         info = {}
 
+        self.timer.get_obs.tic()
         self.obs = self._get_obs()
+        self.timer.get_obs.toc()
 
         self.prev_action = action.copy()
-        # self.timer += time()
-        # self.counter += 1
-        # print "Took {} ms".format(self.timer / self.counter * 1000)
 
         return self.obs, reward, done, info
 
@@ -178,6 +187,7 @@ class OffRoadNavEnv(gym.Env):
         # self.vehicle_model_gpu.reset(s0)
 
         self.state[:] = s0[:]
+        self.total_reward = 0
 
         if self.viewer.initialized():
             for obj in self.map.dynamic_objects:

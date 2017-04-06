@@ -1,6 +1,8 @@
 import os
 import cv2
+import time
 import numpy as np
+from collections import deque
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
@@ -55,3 +57,26 @@ def get_options_from_TF_flags():
         pass
 
     return options
+
+
+class Timer(object):
+    def __init__(self, message, maxlen=1000):
+        self.timer = deque(maxlen=maxlen)
+        self.counter = 0
+        self.message = message
+
+    def tic(self):
+        self.t = time.time()
+
+    def toc(self):
+        self.timer.append(time.time() - self.t)
+
+        self.counter += 1
+        if self.counter % self.timer.maxlen == 0:
+            self.counter = 0
+
+            import tensorflow as tf
+            tf.logging.set_verbosity(tf.logging.INFO)
+            tf.logging.info("average time of {} = {:.2f} ms".format(
+                self.message, np.mean(self.timer) * 1000
+            ))

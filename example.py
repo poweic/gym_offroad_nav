@@ -9,6 +9,7 @@ env = gym.make("OffRoadNav-v0")
 # env.env._configure({"n_agents_per_worker": 2})
 
 for i in range(100):
+    print "========== RESET =========="
     env.reset()
     done = False
 
@@ -19,6 +20,6 @@ for i in range(100):
         action[0] *= np.arange(len(action[0]))
         state, reward, done, _ = env.step(action.squeeze())
         total_return = total_return + reward.squeeze()
-        print "total_return = ({:4.0f}, {:4.0f})".format(total_return[0], total_return[1])
+        print "total_return = ({:6.2f}, {:6.2f})".format(total_return[0], total_return[1])
         env.render()
         # cv2.waitKey(0)

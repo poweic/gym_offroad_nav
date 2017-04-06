@@ -16,7 +16,7 @@ def to_image(R, K=1, interpolation=cv2.INTER_NEAREST):
     return R
 
 def dirname(fn):
-    return os.path.dirname(os.path.realpath(__file__))
+    return os.path.dirname(os.path.realpath(fn))
 
 def normalize(x):
     value_range = np.max(x) - np.min(x)
@@ -32,8 +32,7 @@ def clip(x, minimum, maximum):
 def get_options_from_TF_flags():
 
     options = AttrDict({
-        'field_of_view': 32,
-        'downsample': 2,
+        'field_of_view': 64,
         'min_mu_vf':  6. / 3.6,
         'max_mu_vf': 14. / 3.6,
         'min_mu_steer': -30 * np.pi / 180,
@@ -43,7 +42,7 @@ def get_options_from_TF_flags():
         'wheelbase': 2.0,
         'map_def': 'map2',
         'command_freq': 5,
-        'n_agents_per_worker': 4,
+        'n_agents_per_worker': 16,
         'viewport_scale': 4,
         'drift': False
     })

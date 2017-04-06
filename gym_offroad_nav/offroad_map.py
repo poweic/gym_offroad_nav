@@ -18,6 +18,17 @@ def load_yaml(fn):
         for k, v in data.iteritems()
     })
 
+def load_rewards(track):
+    import scipy.io
+    fn = "{}/../data/{}.mat".format(dirname(__file__), track)
+    rewards = scipy.io.loadmat(fn)['reward'].astype(np.float32)
+    rewards = (rewards - np.min(rewards)) / (np.max(rewards) - np.min(rewards))
+    # rewards = (rewards - self.cell_size) * 2 # 128
+    rewards = (rewards - 0.7) * 2
+    rewards[rewards > 0] *= 10
+
+    return rewards
+
 class OffRoadMap(object):
     def __init__(self, map_def):
 
@@ -27,7 +38,11 @@ class OffRoadMap(object):
         self._init_boundary()
 
         self.rgb_map = self.colorize(self.map_structure)
-        self.rewards = self.cvt_map_structure_to_rewards(self.map_structure)
+        # self.rewards = self.cvt_map_structure_to_rewards(self.map_structure)
+        self.rewards = load_rewards("big_track")
+        print self.rewards.shape
+        # cv2.imshow("rewards", self.rewards)
+        # cv2.waitKey(1)
 
         # TODO
         # Maybe we can use the idea of "context" to create static/dynamic object

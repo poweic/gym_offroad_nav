@@ -47,9 +47,7 @@ class OffRoadNavEnv(gym.Env):
         # the simplest front view sensor
         self.sensors = {
             'vehicle_state': Odometry(self.opts.odom_noise_level),
-            'front_view': FrontViewer(
-                self.map, self.opts.field_of_view, self.opts.downsample
-            )
+            'front_view': FrontViewer(self.map, self.opts.field_of_view)
         }
 
         # self.vehicle_model_gpu = VehicleModelGPU(...)

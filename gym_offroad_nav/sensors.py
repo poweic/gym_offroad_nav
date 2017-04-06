@@ -52,37 +52,35 @@ class Odometry(SensorModel):
     def get_obs_space(self):
         return spaces.Box(low=FLOAT_MIN, high=FLOAT_MAX, shape=(6, 1))
 
-def pad_image(img, pad, fill_value=None):
-    if img.ndim == 2:
-        img = img[..., None]
+def rotated_rect(img, (cx, cy), (width, height), angle, scale=1):
+    pivot = (width/2, height)
+    M = cv2.getRotationMatrix2D(pivot, angle, scale)
+    M[:, 2] += (cx - width/2, cy - height)
 
-    shape = np.asarray(img.shape) + [pad * 2, pad * 2, 0]
-    if fill_value is None:
-        fill_value = np.min(img)
-    padded_x = np.full(shape, fill_value, dtype=img.dtype)
-    padded_x[pad:-pad, pad:-pad] = img
-    return padded_x
+    warped = cv2.warpAffine(
+        img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_LINEAR,
+        # borderMode=cv2.BORDER_REPLICATE
+    )
+
+    return warped
 
 # This sensor model return the front view of the vehicle as an image of shape
 # fov x fov, where fov is the field of view (how far you see).
 class FrontViewer(SensorModel):
-    def __init__(self, map, field_of_view, downsample, noise_level=0):
+    def __init__(self, map, field_of_view, noise_level=0):
         super(FrontViewer, self).__init__(noise_level)
 
         self.map = map
         self.field_of_view = field_of_view
-        self.downsample = float(downsample)
         self.noise_level = noise_level
 
-        self.padded_rewards = pad_image(
-            self.map.rewards,
-            self.field_of_view
-        )
+        self.rewards = self.map.rewards[..., None]
+        self.rgb_map = self.map.rgb_map.astype(np.float32) / 255
 
-        self.padded_rgb_map = pad_image(
-            self.map.rgb_map,
-            self.field_of_view
-        )
+        R = self.rewards
+        C = self.rgb_map
+        W = self.get_waypoint_map()
+        self.features = np.concatenate([R,C,W], axis=-1)
 
         self.images = None
 
@@ -94,33 +92,15 @@ class FrontViewer(SensorModel):
         cxs, cys, angles = self._get_cx_cy_angle(state)
         n_agents = len(angles)
 
-        R = self.padded_rewards
-        C = self.padded_rgb_map
-        W = self._get_padded_waypoint_map()
-
-        height, width = R.shape[:2]
+        height, width = self.rewards.shape[:2]
         size = (width, height)
         fov = self.field_of_view
 
-        n_channels = 5
+        n_channels = self.num_features()
         images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
 
-        # self.timer -= time.time()
         for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
-            # print "[{}:{}, {}:{}]".format(cy-fov, cy, cx-fov/2, cx+fov/2)
-            M = cv2.getRotationMatrix2D((cx, cy), angle, 1)
-
-            sx = slice(cx-fov/2, cx+fov/2)
-            sy = slice(cy-fov, cy)
-
-            images[i, ..., 0  ] = cv2.warpAffine(R, M, size)[sy, sx]
-            images[i, ..., 1:4] = cv2.warpAffine(C, M, size)[sy, sx]
-            images[i, ..., 4  ] = cv2.warpAffine(W, M, size)[sy, sx]
-        # self.timer += time.time()
-        # self.counter += 1
-
-        # downsample the image
-        images = self.resize(images)
+            images[i] = rotated_rect(self.features, (cx, cy), (fov, fov), angle)
 
         self.images = images
 
@@ -140,9 +120,12 @@ class FrontViewer(SensorModel):
 
         return images
 
+    def num_features(self):
+        return self.features.shape[-1]
+
     def get_output_shape(self):
-        m = int(self.field_of_view / self.downsample)
-        return (m, m, 5)
+        m = int(self.field_of_view)
+        return (m, m, self.num_features())
 
     def get_obs_space(self):
         return spaces.Box(low=FLOAT_MIN, high=FLOAT_MAX,
@@ -150,28 +133,31 @@ class FrontViewer(SensorModel):
 
     def render(self):
 
+        return
+
         if self.images is None:
             return
 
         n_agents, h, w = self.images.shape[:3]
 
         # visualization (for debugging purpose)
-        disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.uint8)
+        disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.float32)
         for i, img in enumerate(self.images):
             s = slice(i*w, (i+1)*w)
-            disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
-            disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]]).astype(np.uint8)
-            disp_img[2*h:3*h, s] += (img[..., 4:5] * 255).astype(np.uint8)
+            # disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
+            disp_img[0*h:1*h, s] += img[..., 0:1]
+            disp_img[1*h:2*h, s]  = img[..., [3, 2, 1]]
+            disp_img[2*h:3*h, s] += img[..., 4:5]
 
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
 
-    def _get_padded_waypoint_map(self):
+    def get_waypoint_map(self):
 
         if hasattr(self, 'padded_waypoint_map'):
             return self.padded_waypoint_map
 
-        m = np.zeros_like(self.padded_rewards)
+        m = np.zeros(self.rewards.shape, dtype=np.float32)
         bounds = self.map.bounds
         fov = self.field_of_view
 
@@ -183,8 +169,8 @@ class FrontViewer(SensorModel):
 
             # draw coin the this numpy ndarray, need to convert
             ix, iy = self.map.get_ixiy(*obj.position)
-            x, y = ix - bounds.x_min, bounds.y_max - 1 - iy
-            cv2.circle(m, (x+fov, y+fov), color=(1, 1, 1), thickness=-1,
+            x, y = ix[0] - bounds.x_min, bounds.y_max - 1 - iy[0]
+            cv2.circle(m, (x, y), color=(1, 1, 1), thickness=-1,
                        radius=int(obj.radius / self.map.cell_size))
 
         self.padded_waypoint_map = m
@@ -200,8 +186,8 @@ class FrontViewer(SensorModel):
         iiy = np.clip(self.map.bounds.y_max - 1 - iy, 0, self.map.height - 1)
 
         fov = self.field_of_view
-        cxs, cys = iix + fov, iiy + fov
-        angles = -theta * RAD2DEG
+        cxs, cys = iix, iiy
+        angles = theta * RAD2DEG
 
         return cxs, cys, angles
 

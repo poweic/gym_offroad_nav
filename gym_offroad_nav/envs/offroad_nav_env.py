@@ -187,9 +187,8 @@ class OffRoadNavEnv(gym.Env):
         self.state[:] = s0[:]
         self.total_reward = 0
 
-        if self.viewer.initialized():
-            for obj in self.map.dynamic_objects:
-                obj.reset()
+        for obj in self.map.dynamic_objects:
+            obj.reset()
 
         return self._get_obs()
 

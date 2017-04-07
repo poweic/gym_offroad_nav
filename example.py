@@ -22,4 +22,4 @@ for i in range(1000):
         total_return = total_return + reward.squeeze()
         print "total_return = ({:6.2f}, {:6.2f})".format(total_return[0], total_return[1])
         env.render()
-        cv2.waitKey(50)
+        # cv2.waitKey(50)

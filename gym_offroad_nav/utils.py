@@ -40,7 +40,7 @@ def get_options_from_TF_flags():
         'timestep': 0.025,
         'odom_noise_level': 0.02,
         'wheelbase': 2.0,
-        'map_def': 'map3',
+        'map_def': 'map4',
         'command_freq': 5,
         'n_agents_per_worker': 16,
         'viewport_scale': 4,

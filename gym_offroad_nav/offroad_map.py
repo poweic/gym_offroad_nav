@@ -71,6 +71,25 @@ class OffRoadMap(object):
             setattr(self, k, v)
         print "done."
 
+    def save_rgb_map_in_png(self, fn):
+        import PIL.Image
+
+        img = PIL.Image.fromarray(self.map_structure.astype(np.uint8))
+        img = img.convert(mode='P')
+        classes = self.class_id_to_rgb.keys()
+        max_id = max(classes)
+
+        colors = np.zeros((max_id, 3), np.uint8)
+        for i in range(max_id):
+            if i in classes:
+                colors[i] = self.class_id_to_rgb[i]
+
+        colors = colors.reshape(-1).tolist()
+
+        img.putpalette(colors)
+
+        img.save(fn)
+
     def colorize(self, labels):
         print "colorizing ...",
         img = np.zeros((labels.shape[0], labels.shape[1], 3), dtype=np.uint8)

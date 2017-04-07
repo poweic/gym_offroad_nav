@@ -40,7 +40,7 @@ def get_options_from_TF_flags():
         'timestep': 0.025,
         'odom_noise_level': 0.02,
         'wheelbase': 2.0,
-        'map_def': 'map2',
+        'map_def': 'map3',
         'command_freq': 5,
         'n_agents_per_worker': 16,
         'viewport_scale': 4,
@@ -59,7 +59,7 @@ def get_options_from_TF_flags():
 
 
 class Timer(object):
-    def __init__(self, message, maxlen=1000):
+    def __init__(self, message, maxlen=10000):
         self.timer = deque(maxlen=maxlen)
         self.counter = 0
         self.message = message

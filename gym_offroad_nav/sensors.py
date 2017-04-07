@@ -74,7 +74,7 @@ class FrontViewer(SensorModel):
         self.field_of_view = field_of_view
         self.noise_level = noise_level
 
-        self.rewards = self.map.rewards[..., None]
+        self.rewards = self.map.rewards[..., None].astype(np.float32)
         self.rgb_map = self.map.rgb_map.astype(np.float32) / 255
 
         R = self.rewards
@@ -133,19 +133,20 @@ class FrontViewer(SensorModel):
 
     def render(self):
 
-        return
-
         if self.images is None:
             return
 
         n_agents, h, w = self.images.shape[:3]
+
+        min_reward = min(self.map.class_id_to_rewards)
+        max_reward = max(self.map.class_id_to_rewards)
 
         # visualization (for debugging purpose)
         disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.float32)
         for i, img in enumerate(self.images):
             s = slice(i*w, (i+1)*w)
             # disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
-            disp_img[0*h:1*h, s] += img[..., 0:1]
+            disp_img[0*h:1*h, s] += (img[..., 0:1] - min_reward) / (max_reward - min_reward)
             disp_img[1*h:2*h, s]  = img[..., [3, 2, 1]]
             disp_img[2*h:3*h, s] += img[..., 4:5]
 

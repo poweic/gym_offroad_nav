@@ -38,8 +38,8 @@ class OffRoadMap(object):
         self._init_boundary()
 
         self.rgb_map = self.colorize(self.map_structure)
-        # self.rewards = self.cvt_map_structure_to_rewards(self.map_structure)
-        self.rewards = load_rewards("big_track")
+        self.rewards = self.cvt_map_structure_to_rewards(self.map_structure)
+        # self.rewards = load_rewards("big_track")
         print self.rewards.shape
         # cv2.imshow("rewards", self.rewards)
         # cv2.waitKey(1)

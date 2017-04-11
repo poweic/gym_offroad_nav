@@ -25,12 +25,13 @@ def clip(x, minimum, maximum):
     return np.clip(x, minimum, maximum).astype(np.int32)
 
 # Get options from TensorFlow FLAGS, use default values if not provided
-def get_options_from_TF_flags():
+def get_options_from_TF_flags(keys):
     options = AttrDict()
     try:
         import tensorflow as tf
-        for key in options.keys():
-            options[key] = getattr(tf.flags.FLAGS, key, options[key])
+        for key in keys:
+            if hasattr(tf.flags.FLAGS, key):
+                options[key] = getattr(tf.flags.FLAGS, key)
     except Exception as e:
         print e
         pass

@@ -39,7 +39,7 @@ class OffRoadNavEnv(gym.Env):
 
     def __init__(self):
         self.opts = AttrDict(self.default_options)
-        self.opts.update(get_options_from_TF_flags())
+        self.opts.update(get_options_from_TF_flags(self.opts.keys()))
         self.initialize()
 
     def _configure(self, opts):

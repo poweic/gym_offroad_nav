@@ -7,8 +7,9 @@ import numpy as np
 from time import time
 from gym import error, spaces, utils
 from gym.utils import seeding
+from attrdict import AttrDict
 
-from gym_offroad_nav.utils import get_options_from_TF_flags, AttrDict, Timer
+from gym_offroad_nav.utils import get_options_from_TF_flags, Timer
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
@@ -20,8 +21,25 @@ class OffRoadNavEnv(gym.Env):
         'render.modes': ['human', 'rgb_array'], # 'video.frames_per_second': 30
     }
 
+    default_options = {
+        'field_of_view': 64,
+        'min_mu_vf':  6. / 3.6,
+        'max_mu_vf': 14. / 3.6,
+        'min_mu_steer': -30 * np.pi / 180,
+        'max_mu_steer': +30 * np.pi / 180,
+        'timestep': 0.025,
+        'odom_noise_level': 0.02,
+        'wheelbase': 2.0,
+        'map_def': 'map4',
+        'command_freq': 5,
+        'n_agents_per_worker': 16,
+        'viewport_scale': 4,
+        'drift': False
+    }
+
     def __init__(self):
-        self.opts = get_options_from_TF_flags()
+        self.opts = AttrDict(self.default_options)
+        self.opts.update(get_options_from_TF_flags())
         self.initialize()
 
     def _configure(self, opts):
@@ -71,8 +89,6 @@ class OffRoadNavEnv(gym.Env):
             # spaces.Box(low=0, high=255, shape=(fov, fov, 5)),
             # spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
-
-        print self.observation_space
 
         # Rendering
         self.viewer = Viewer(self)

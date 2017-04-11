@@ -3,11 +3,7 @@ import cv2
 import time
 import numpy as np
 from collections import deque
-
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
+from attrdict import AttrDict
 
 def to_image(R, K=1, interpolation=cv2.INTER_NEAREST):
     R = normalize(R)
@@ -30,23 +26,7 @@ def clip(x, minimum, maximum):
 
 # Get options from TensorFlow FLAGS, use default values if not provided
 def get_options_from_TF_flags():
-
-    options = AttrDict({
-        'field_of_view': 64,
-        'min_mu_vf':  6. / 3.6,
-        'max_mu_vf': 14. / 3.6,
-        'min_mu_steer': -30 * np.pi / 180,
-        'max_mu_steer': +30 * np.pi / 180,
-        'timestep': 0.025,
-        'odom_noise_level': 0.02,
-        'wheelbase': 2.0,
-        'map_def': 'map4',
-        'command_freq': 5,
-        'n_agents_per_worker': 16,
-        'viewport_scale': 4,
-        'drift': False
-    })
-
+    options = AttrDict()
     try:
         import tensorflow as tf
         for key in options.keys():
@@ -54,9 +34,7 @@ def get_options_from_TF_flags():
     except Exception as e:
         print e
         pass
-
     return options
-
 
 class Timer(object):
     def __init__(self, message, maxlen=10000):

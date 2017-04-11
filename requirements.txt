@@ -3,3 +3,4 @@ pyglet==1.2.4
 numpy==1.12.1
 gym==0.8.1
 colored-traceback==0.2.1
+attrdict==2.0.0

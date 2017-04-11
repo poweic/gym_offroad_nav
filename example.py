@@ -6,7 +6,17 @@ import numpy as np
 import time
 
 env = gym.make("OffRoadNav-v0")
-# env.env._configure({"n_agents_per_worker": 2})
+# All the default_options are defined in gym_offroad_nav/envs/offroad_nav_env.py
+# You can either change the default arguments or reconfigure the env here
+# print env.env.default_options
+env.env._configure({"map_def": "map5"})
+
+# right now there's only spaces.Tuple in openai gym,
+print env.observation_space
+
+state = env.reset()
+for key, obs in state.iteritems():
+    print 'state["{}"]: shape = {}, dtype = {}'.format(key, obs.shape, obs.dtype)
 
 for i in range(1000):
     # print "========== RESET =========="

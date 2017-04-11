@@ -1,8 +1,12 @@
 import cv2
 import yaml
+import PIL.Image
 import numpy as np
 from gym_offroad_nav.utils import AttrDict, dirname
 from gym_offroad_nav.interactable import OffRoadScene, Coin
+
+def get_palette_color(img):
+    print np.frombuffer(img.palette.palette, np.uint8).reshape(-1, 3)
 
 def save_yaml(fn, data):
     data = {
@@ -65,14 +69,19 @@ class OffRoadMap(object):
 
     def load_map_def(self, map_def):
         print "loading map ...",
-        map_def = "{}/../maps/{}.yaml".format(dirname(__file__), map_def)
-        map_def = load_yaml(map_def)
+        cwd = dirname(__file__)
+        map_def_fn = "{}/../maps/{}.yaml".format(cwd, map_def)
+        map_def = load_yaml(map_def_fn)
+
+        if 'map_structure_filename' in map_def:
+            fn = "{}/../maps/{}".format(cwd, map_def.map_structure_filename)
+            map_def.map_structure = np.asarray(PIL.Image.open(fn))
+
         for k, v in map_def.iteritems():
             setattr(self, k, v)
         print "done."
 
     def save_rgb_map_in_png(self, fn):
-        import PIL.Image
 
         img = PIL.Image.fromarray(self.map_structure.astype(np.uint8))
         img = img.convert(mode='P')

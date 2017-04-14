@@ -18,18 +18,33 @@ state = env.reset()
 for key, obs in state.iteritems():
     print 'state["{}"]: shape = {}, dtype = {}'.format(key, obs.shape, obs.dtype)
 
+np.set_printoptions(linewidth=1000,
+    formatter={'float_kind': lambda x: "{:+7.2f}".format(x).replace('+', ' ')})
+
 for i in range(1000):
-    # print "========== RESET =========="
     env.reset()
     done = False
 
     total_return = 0
 
     while not np.any(done):
+        # sample actions for agents
         action = env.env.sample_action()
-        action[0] *= np.arange(len(action[0]))
+
+        # Change speed command so that it's more diverse (for debugging purpose)
+        action[0] *= np.arange(len(action[0])).astype(np.float) / 10
+
+        # step in the environment
         state, reward, done, _ = env.step(action.squeeze())
-        total_return = total_return + reward.squeeze()
-        print "total_return = ({:6.2f}, {:6.2f})".format(total_return[0], total_return[1])
+
+        # collect the reward
+        total_return += reward
+        print "total_return = {}".format(total_return)
+
+        # refresh OpenGL renderer
         env.render()
-        # cv2.waitKey(50)
+
+        # (optinal) if you want to slow it down
+        # cv2.waitKey(0)
+
+    print "\n\n"

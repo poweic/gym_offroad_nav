@@ -75,7 +75,7 @@ class OffRoadMap(object):
 
         if 'map_structure_filename' in map_def:
             fn = "{}/../maps/{}".format(cwd, map_def.map_structure_filename)
-            map_def.map_structure = np.asarray(PIL.Image.open(fn))
+            map_def.map_structure = np.array(PIL.Image.open(fn))
 
         for k, v in map_def.iteritems():
             setattr(self, k, v)
@@ -86,10 +86,9 @@ class OffRoadMap(object):
         img = PIL.Image.fromarray(self.map_structure.astype(np.uint8))
         img = img.convert(mode='P')
         classes = self.class_id_to_rgb.keys()
-        max_id = max(classes)
 
-        colors = np.zeros((max_id, 3), np.uint8)
-        for i in range(max_id):
+        colors = np.zeros((len(classes), 3), np.uint8)
+        for i in range(len(classes)):
             if i in classes:
                 colors[i] = self.class_id_to_rgb[i]
 

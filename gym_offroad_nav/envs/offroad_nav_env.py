@@ -23,8 +23,8 @@ class OffRoadNavEnv(gym.Env):
 
     default_options = {
         'field_of_view': 64,
-        'min_mu_vf':  6. / 3.6,
-        'max_mu_vf': 14. / 3.6,
+        'min_mu_vf': -14. / 3.6,
+        'max_mu_vf': +14. / 3.6,
         'min_mu_steer': -30 * np.pi / 180,
         'max_mu_steer': +30 * np.pi / 180,
         'timestep': 0.025,
@@ -138,29 +138,39 @@ class OffRoadNavEnv(gym.Env):
         -------
         A 4-element tuple (state, reward, done, info)
         '''
+
         self.timer.vehicle_model.tic()
         action = action.reshape(self.dof, self.opts.n_agents_per_worker)
         n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
-        state = self.state.copy()
+        new_state = self.state.copy()
         for j in range(n_sub_steps):
-            state = self.vehicle_model.predict(state, action)
-        self.state[:] = state[:]
-        self.timer.vehicle_model.toc()
+            new_state = self.vehicle_model.predict(new_state, action)
 
-        # compute reward and determine whether it's done
+        # compute reward based on new_state
         self.timer.others.tic()
-        reward = self.rewarder.eval(self.state)
+        reward = self.rewarder.eval(new_state)
         self.total_reward += reward
 
-        # Y forward, X lateral
+        # if new position is in the tree, then use old one & set velocity = 0
+        in_tree = self.map.in_tree(new_state)
+        new_state[0:3, in_tree] = self.state[0:3, in_tree]
+        new_state[3:6, in_tree] = 0
+        self.vehicle_model.reset(new_state, in_tree)
+
+        self.state[:] = new_state[:]
+
+        self.timer.vehicle_model.toc()
+
+        # Determine whether it's done (Y forward, X lateral)
         x, y = self.state[:2]
-        done = ~self.map.contains(x, y)
-        done |= (self.total_reward < self.map.minimum_score).squeeze()
+        info = AttrDict(done = ~self.map.contains(x, y))
+        done = np.any(info.done)
+
+        # FIXME cannot use total_reward as terminal criteria, because this
+        # means there's no way an agent can change it's destiny
+        # done |= (self.total_reward < self.map.minimum_score).squeeze()
 
         self.timer.others.toc()
-
-        # debug info
-        info = {}
 
         self.timer.get_obs.tic()
         self.obs = self._get_obs()
@@ -214,4 +224,6 @@ class OffRoadNavEnv(gym.Env):
             self.viewer.close()
             return
 
-        self.viewer.render()
+        # self.viewer.render()
+
+        return self.viewer.render(return_rgb_array = mode=='rgb_array')

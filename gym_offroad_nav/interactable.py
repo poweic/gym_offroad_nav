@@ -123,7 +123,18 @@ class OffRoadScene(Interactable):
 
     def react(self, state):
         x, y = state[:2]
-        return self._bilinear_reward_lookup(x, y)
+        r = self._bilinear_reward_lookup(x, y)
+
+        classes = self.map.get_class(x, y)
+        impact = (classes == 7)
+
+        vel = np.sqrt(state[3] ** 2 + state[4] ** 2)
+        impact_penalty = 10. * impact * vel
+        low_speed_penalty = vel < 1e-1
+
+        reward = r - impact_penalty - low_speed_penalty
+
+        return reward
 
     def _bilinear_reward_lookup(self, x, y):
         ix, iy = self.map.get_ixiy(x, y)

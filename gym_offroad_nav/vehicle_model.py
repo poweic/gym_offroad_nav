@@ -88,8 +88,12 @@ class VehicleModel():
 
         return state
 
-    def reset(self, state):
+    def reset(self, state, mask=None):
         # state: [x, y, theta, x', y', theta']
         # extract the last 3 elements from state
         y0 = state[3:6].reshape(3, -1)
-        self.x = np.dot(np.linalg.pinv(self.C), y0)
+
+        if mask is None:
+            self.x = np.dot(np.linalg.pinv(self.C), y0)
+        else:
+            self.x[:, mask] = np.dot(np.linalg.pinv(self.C), y0[:, mask])

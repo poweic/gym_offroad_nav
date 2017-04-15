@@ -19,13 +19,14 @@ class Viewer(object):
     def initialized(self):
         return self.viewer is not None
 
-    def render(self):
+    def render(self, **kwargs):
         if self.viewer is None:
             self._init_viewer()
 
-        self.viewer.render()
         for sensor in self.env.sensors.itervalues():
             sensor.render()
+
+        return self.viewer.render(**kwargs)
 
     def close(self):
         if self.viewer is not None:

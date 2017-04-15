@@ -116,6 +116,15 @@ class OffRoadMap(object):
         print "done."
         return rewards
 
+    def get_class(self, x, y):
+        b = self.bounds
+        ix, iy = self.get_ixiy(x, y)
+        c = self.map_structure[b.y_max - 1 - iy, ix - b.x_min]
+        return c
+
+    def in_tree(self, state):
+        return self.get_class(*state[:2]) == 7
+
     def _init_boundary(self):
 
         self.height, self.width = self.map_structure.shape

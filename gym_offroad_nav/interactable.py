@@ -130,7 +130,7 @@ class OffRoadScene(Interactable):
 
         vel = np.sqrt(state[3] ** 2 + state[4] ** 2)
         impact_penalty = 10. * impact * vel
-        low_speed_penalty = vel < 1e-1
+        low_speed_penalty = 1e-1 / (vel + 1e-1)
 
         reward = r - impact_penalty - low_speed_penalty
 

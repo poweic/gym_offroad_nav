@@ -34,6 +34,7 @@ class OffRoadNavEnv(gym.Env):
         'command_freq': 5,
         'n_agents_per_worker': 16,
         'viewport_scale': 4,
+        'max_steps': 100,
         'drift': False
     }
 
@@ -146,10 +147,13 @@ class OffRoadNavEnv(gym.Env):
         for j in range(n_sub_steps):
             new_state = self.vehicle_model.predict(new_state, action)
 
+        info = AttrDict()
+
         # compute reward based on new_state
         self.timer.others.tic()
-        reward = self.rewarder.eval(new_state)
-        self.total_reward += reward
+        info.reward = self.rewarder.eval(new_state)
+        self.total_reward += info.reward
+        reward = np.mean(info.reward)
 
         # if new position is in the tree, then use old one & set velocity = 0
         in_tree = self.map.in_tree(new_state)
@@ -163,7 +167,7 @@ class OffRoadNavEnv(gym.Env):
 
         # Determine whether it's done (Y forward, X lateral)
         x, y = self.state[:2]
-        info = AttrDict(done = ~self.map.contains(x, y))
+        info.done = ~self.map.contains(x, y)
         done = np.any(info.done)
 
         # FIXME cannot use total_reward as terminal criteria, because this
@@ -177,6 +181,10 @@ class OffRoadNavEnv(gym.Env):
         self.timer.get_obs.toc()
 
         self.prev_action = action.copy()
+        self.steps += 1
+
+        if self.steps >= self.opts.max_steps:
+            done = True
 
         return self.obs, reward, done, info
 
@@ -208,10 +216,10 @@ class OffRoadNavEnv(gym.Env):
     def _reset(self):
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
-        # self.vehicle_model_gpu.reset(s0)
 
         self.state[:] = s0[:]
         self.total_reward = 0
+        self.steps = 0
 
         for obj in self.map.dynamic_objects:
             obj.reset()

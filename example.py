@@ -47,4 +47,4 @@ for i in range(1000):
         # (optinal) if you want to slow it down
         # cv2.waitKey(0)
 
-    print "\n\n"
+    print "\n"

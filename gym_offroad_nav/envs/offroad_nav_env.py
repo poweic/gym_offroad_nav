@@ -9,7 +9,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 from attrdict import AttrDict
 
-from gym_offroad_nav.utils import get_options_from_TF_flags, Timer
+from gym_offroad_nav.utils import get_options_from_TF_flags, Timer, get_speed
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
@@ -32,7 +32,7 @@ class OffRoadNavEnv(gym.Env):
         'wheelbase': 2.0,
         'map_def': 'map5',
         'command_freq': 5,
-        'n_agents_per_worker': 16,
+        'n_agents_per_worker': 1,
         'viewport_scale': 4,
         'max_steps': 100,
         'drift': False
@@ -147,16 +147,19 @@ class OffRoadNavEnv(gym.Env):
         for j in range(n_sub_steps):
             new_state = self.vehicle_model.predict(new_state, action)
 
+        # See if the car is in tree. If the speed is too high, then it's crashed
+        in_tree = self.map.in_tree(new_state)
+        crashed = in_tree & (get_speed(new_state) > 2)
+
         info = AttrDict()
 
         # compute reward based on new_state
         self.timer.others.tic()
-        info.reward = self.rewarder.eval(new_state)
+        info.reward = self.rewarder.eval(new_state) - crashed * 100
         self.total_reward += info.reward
         reward = np.mean(info.reward)
 
         # if new position is in the tree, then use old one & set velocity = 0
-        in_tree = self.map.in_tree(new_state)
         new_state[0:3, in_tree] = self.state[0:3, in_tree]
         new_state[3:6, in_tree] = 0
         self.vehicle_model.reset(new_state, in_tree)
@@ -167,7 +170,7 @@ class OffRoadNavEnv(gym.Env):
 
         # Determine whether it's done (Y forward, X lateral)
         x, y = self.state[:2]
-        info.done = ~self.map.contains(x, y)
+        info.done = ~self.map.contains(x, y) | crashed
         done = np.any(info.done)
 
         # FIXME cannot use total_reward as terminal criteria, because this

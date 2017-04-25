@@ -14,6 +14,9 @@ def to_image(R, K=1, interpolation=cv2.INTER_NEAREST):
 def dirname(fn):
     return os.path.dirname(os.path.realpath(fn))
 
+def get_speed(state):
+    return np.sqrt(state[3] ** 2 + state[4] ** 2)
+
 def normalize(x):
     value_range = np.max(x) - np.min(x)
     if value_range != 0:

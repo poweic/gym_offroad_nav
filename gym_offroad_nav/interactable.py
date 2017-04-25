@@ -2,7 +2,7 @@ import abc
 import numpy as np
 from copy import deepcopy
 from collections import deque
-from gym_offroad_nav.utils import AttrDict, clip, dirname
+from gym_offroad_nav.utils import AttrDict, clip, dirname, get_speed
 from gym_offroad_nav import rendering
 
 class Interactable(object):
@@ -128,7 +128,7 @@ class OffRoadScene(Interactable):
         classes = self.map.get_class(x, y)
         impact = (classes == 7)
 
-        vel = np.sqrt(state[3] ** 2 + state[4] ** 2)
+        vel = get_speed(state)
         impact_penalty = 10. * impact * vel
         low_speed_penalty = 1e-1 / (vel + 1e-1)
 

@@ -32,7 +32,7 @@ class OffRoadNavEnv(gym.Env):
         'wheelbase': 2.0,
         'map_def': 'map5',
         'command_freq': 5,
-        'n_agents_per_worker': 1,
+        'n_agents_per_worker': 2,
         'viewport_scale': 4,
         'max_steps': 100,
         'drift': False
@@ -149,7 +149,7 @@ class OffRoadNavEnv(gym.Env):
 
         # See if the car is in tree. If the speed is too high, then it's crashed
         in_tree = self.map.in_tree(new_state)
-        crashed = in_tree & (get_speed(new_state) > 2)
+        crashed = in_tree & (get_speed(new_state) > 1.)
 
         info = AttrDict()
 

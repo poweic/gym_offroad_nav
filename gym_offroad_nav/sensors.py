@@ -79,8 +79,6 @@ class FrontViewer(SensorModel):
 
         R = self.rewards
         C = self.rgb_map
-        W = self.get_waypoint_map()
-        self.features = np.concatenate([R,C,W], axis=-1)
 
         self.images = None
 
@@ -99,8 +97,11 @@ class FrontViewer(SensorModel):
         n_channels = self.num_features()
         images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
 
+        W = self.get_waypoint_map(n_agents)
+
         for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
-            images[i] = rotated_rect(self.features, (cx, cy), (fov, fov), angle)
+            features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
+            images[i] = rotated_rect(features, (cx, cy), (fov, fov), angle)
 
         self.images = images
 
@@ -121,7 +122,7 @@ class FrontViewer(SensorModel):
         return images
 
     def num_features(self):
-        return self.features.shape[-1]
+        return 5
 
     def get_output_shape(self):
         m = int(self.field_of_view)
@@ -153,28 +154,25 @@ class FrontViewer(SensorModel):
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
 
-    def get_waypoint_map(self):
+    def get_waypoint_map(self, n_agents):
 
-        if hasattr(self, 'padded_waypoint_map'):
-            return self.padded_waypoint_map
-
-        m = np.zeros(self.rewards.shape, dtype=np.float32)
+        m = np.zeros((n_agents,) + self.rewards.shape, dtype=np.float32)
         bounds = self.map.bounds
         fov = self.field_of_view
 
-        for obj in self.map.dynamic_objects:
+        for i in range(n_agents):
+            for obj in self.map.dynamic_objects:
+                # draw coin the this numpy ndarray, need to convert
+                ix, iy = self.map.get_ixiy(*obj.position)
+                x, y = ix[0] - bounds.x_min, bounds.y_max - 1 - iy[0]
 
-            # TODO check whether the waypoint is still valid, but this means
-            # we need to create separate waypoint map for each agent ...
-            # if not obj.valid: continue
+                if (isinstance(obj.valid, bool) and obj.valid) or obj.valid[i]:
+                    color = (1, 1, 1)
+                else:
+                    color = (0, 0, 0)
 
-            # draw coin the this numpy ndarray, need to convert
-            ix, iy = self.map.get_ixiy(*obj.position)
-            x, y = ix[0] - bounds.x_min, bounds.y_max - 1 - iy[0]
-            cv2.circle(m, (x, y), color=(1, 1, 1), thickness=-1,
-                       radius=int(obj.radius / self.map.cell_size))
-
-        self.padded_waypoint_map = m
+                cv2.circle(m[i], (x, y), color=color, thickness=-1,
+                           radius=int(obj.radius / self.map.cell_size))
 
         return m
 

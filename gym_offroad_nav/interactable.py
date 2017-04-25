@@ -129,10 +129,11 @@ class OffRoadScene(Interactable):
         impact = (classes == 7)
 
         vel = get_speed(state)
-        impact_penalty = 10. * impact * vel
-        low_speed_penalty = 1e-1 / (vel + 1e-1)
+        impact_penalty = -10. * impact * vel
+        reverse_penalty = np.minimum(state[4], 0)
+        low_speed_penalty = -1e-1 / (vel + 1e-1)
 
-        reward = r - impact_penalty - low_speed_penalty
+        reward = r + impact_penalty + low_speed_penalty + reverse_penalty
 
         return reward
 

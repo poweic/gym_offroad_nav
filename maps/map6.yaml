@@ -1,0 +1,27 @@
+cell_size: 0.5
+class_id_to_class_name:
+  0: 'void'
+  1: 'smooth trail'
+  2: 'low vegetation (traversable, drive cautiously, despite geometry)'
+  3: 'slow down'
+  4: 'water (not traversable, despite geometry)'
+  5: 'obstacles (non traversable)'
+  6: 'bushes (non traversable)'
+  7: 'tree (non traversable)}'
+class_id_to_rewards: [0.0, -0.05, -0.5, -0.8, -0.6, -1.0, -1.0, -1.0]
+class_id_to_rgb:
+  0: [255, 255, 255]
+  1: [178, 176, 153]
+  2: [128, 255, 0]
+  3: [156, 76, 30]
+  4: [255, 0, 128]
+  5: [1, 88, 255]
+  6: [0, 160, 0]
+  7: [40, 80, 0]
+initial_pose: [-32.5, 40.2, -0.17453, 0.0, 0.0, 0.0]
+map_structure_filename: "map6.png"
+trail_skeleton_filename: "map6-skel.png"
+waypoint:
+  radius: 2.0
+  reward: 10.0
+  goal_reward: 500

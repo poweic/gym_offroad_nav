@@ -9,7 +9,7 @@ env = gym.make("OffRoadNav-v0")
 # All the default_options are defined in gym_offroad_nav/envs/offroad_nav_env.py
 # You can either change the default arguments or reconfigure the env here
 # print env.env.default_options
-env.env._configure({"map_def": "map5"})
+# env.env._configure({"map_def": "map5"})
 
 # right now there's only spaces.Tuple in openai gym,
 print env.observation_space
@@ -32,7 +32,9 @@ for i in range(1000):
         action = env.env.sample_action()
 
         # Change speed command so that it's more diverse (for debugging purpose)
-        action[0] *= np.arange(len(action[0])).astype(np.float) / 10
+        # action[0] *= np.arange(len(action[0])).astype(np.float) / 10
+        action[0] = 5
+        action[1] *= 0
 
         # step in the environment
         state, reward, done, _ = env.step(action.squeeze())

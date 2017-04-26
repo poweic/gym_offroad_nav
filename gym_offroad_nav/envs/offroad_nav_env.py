@@ -30,9 +30,9 @@ class OffRoadNavEnv(gym.Env):
         'timestep': 0.025,
         'odom_noise_level': 0.02,
         'wheelbase': 2.0,
-        'map_def': 'map5',
+        'map_def': 'map6',
         'command_freq': 5,
-        'n_agents_per_worker': 2,
+        'n_agents_per_worker': 32,
         'viewport_scale': 4,
         'max_steps': 100,
         'drift': False
@@ -96,9 +96,6 @@ class OffRoadNavEnv(gym.Env):
 
         self.init_agents()
 
-        for obj in self.map.dynamic_objects:
-            self.viewer.add(obj)
-
         self.rng = np.random.RandomState()
 
         self.initialized = True
@@ -117,6 +114,7 @@ class OffRoadNavEnv(gym.Env):
 
     def _seed(self, seed=None):
         self.rng, seed = seeding.np_random(seed)
+        self.map.seed(self.rng)
         for sensor in self.sensors.itervalues():
             sensor.seed(self.rng)
         return [seed]
@@ -168,7 +166,7 @@ class OffRoadNavEnv(gym.Env):
 
         self.timer.vehicle_model.toc()
 
-        # Determine whether it's done (Y forward, X lateral)
+        # Determine whether it's done
         x, y = self.state[:2]
         info.done = ~self.map.contains(x, y) | crashed
         done = np.any(info.done)
@@ -192,6 +190,8 @@ class OffRoadNavEnv(gym.Env):
         return self.obs, reward, done, info
 
     def get_initial_state(self):
+        # state is 6-dimensional vector (x, y, theta, x', y', theta'),
+        # where Y is forward, X is lateral
         state = np.array(self.map.initial_pose)
 
         # Reshape to compatiable format
@@ -213,10 +213,8 @@ class OffRoadNavEnv(gym.Env):
             for i in range(self.opts.n_agents_per_worker)
         ]
 
-        for vehicle in self.vehicles:
-            self.viewer.add(vehicle)
-
     def _reset(self):
+        self.map.reset()
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
 
@@ -224,17 +222,28 @@ class OffRoadNavEnv(gym.Env):
         self.total_reward = 0
         self.steps = 0
 
+        self.viewer.clear()
+        self.add_objects_to_viewer()
+
+        """
         for obj in self.map.dynamic_objects:
             obj.reset()
+        """
 
         return self._get_obs()
+
+    def add_objects_to_viewer(self):
+
+        for vehicle in self.vehicles:
+            self.viewer.add(vehicle)
+
+        for obj in self.map.dynamic_objects:
+            self.viewer.add(obj)
 
     def _render(self, mode='human', close=False):
 
         if close:
             self.viewer.close()
             return
-
-        # self.viewer.render()
 
         return self.viewer.render(return_rgb_array = mode=='rgb_array')

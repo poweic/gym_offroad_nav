@@ -4,6 +4,7 @@ import PIL.Image
 import numpy as np
 from gym_offroad_nav.utils import AttrDict, dirname
 from gym_offroad_nav.interactable import OffRoadScene, Coin
+from gym_offroad_nav.global_planner import GlobalPlanner
 
 def get_palette_color(img):
     print np.frombuffer(img.palette.palette, np.uint8).reshape(-1, 3)
@@ -45,27 +46,67 @@ class OffRoadMap(object):
         self.rewards = self.cvt_map_structure_to_rewards(self.map_structure)
         # self.rewards = load_rewards("big_track")
         print self.rewards.shape
-        # cv2.imshow("rewards", self.rewards)
-        # cv2.waitKey(1)
+
+        # Random random generator for global planner to randomly sample paths
+        self.rng = np.random.RandomState()
+        self.global_planner = GlobalPlanner()
 
         # TODO
         # Maybe we can use the idea of "context" to create static/dynamic object
         # instead of passing map to every constructor.
         self.scene = OffRoadScene(map=self)
         self.static_objects = []
-        self.dynamic_objects = []
 
-        print "Creating waypoints ...",
-        self.dynamic_objects.extend([
-            Coin(map=map, position=waypoint, radius=self.waypoint_radius,
-                 reward=self.waypoint_score) for waypoint in self.waypoints
-        ])
-        print "done."
+        self.reset()
 
-        self.interactables = [self.scene] + self.static_objects + self.dynamic_objects
 
-        # cv2.imshow("rgb_map", self.rgb_map)
-        # cv2.waitKey(500)
+    def seed(self, rng):
+        self.rng = rng
+        self.global_planner.seed(self.rng)
+
+    def reset(self):
+        # TODO "reset" is really a bad name, change it plz ...
+
+        self.waypoints, self.initial_pose = self.create_waypoints()
+
+        radius = self.waypoint.radius
+        reward = self.waypoint.reward
+        goal_r = self.waypoint.goal_reward
+
+        self.dynamic_objects = [
+            Coin(
+                map=map, position=waypoint, radius=radius,
+                reward=reward + goal_r * (i == len(self.waypoints) - 1)
+            ) for i, waypoint in enumerate(self.waypoints)
+        ]
+
+    def get_interactables(self):
+        return [self.scene] + self.static_objects + self.dynamic_objects
+
+    def create_waypoints(self):
+        b = self.bounds
+
+        path = self.global_planner.sample_path(self.trail_skeleton, debug=False)
+
+        # b.y_max - 1 - iy, ix - b.x_min
+        path[0] += b.x_min
+        path[1] = b.y_max - 1 - path[1]
+
+        x, y = self.get_xy(path[0], path[1])
+
+        waypoints = np.array([x, y]).T
+
+        # downsample so that coins won't be too crowded
+        waypoints = waypoints[::10]
+
+        dx, dy = waypoints[1] - waypoints[0]
+        theta = np.arctan2(dy, dx) - np.pi / 2
+        initial_pose = [waypoints[0][0], waypoints[0][1], theta, 0, 0, 0]
+
+        # Skip the first waypoint, since it's the start point
+        waypoints = waypoints[1:]
+
+        return waypoints, initial_pose
 
     def load_map_def(self, map_def):
         print "loading map ...",
@@ -73,12 +114,19 @@ class OffRoadMap(object):
         map_def_fn = "{}/../maps/{}.yaml".format(cwd, map_def)
         map_def = load_yaml(map_def_fn)
 
-        if 'map_structure_filename' in map_def:
-            fn = "{}/../maps/{}".format(cwd, map_def.map_structure_filename)
-            map_def.map_structure = np.array(PIL.Image.open(fn))
+        # Load map structure
+        fn = "{}/../maps/{}".format(cwd, map_def.map_structure_filename)
+        map_def.map_structure = np.array(PIL.Image.open(fn))
+
+        # Load MATLAB-pre-skeletonized trail map
+        fn = "{}/../maps/{}".format(cwd, map_def.trail_skeleton_filename)
+        map_def.trail_skeleton = np.array(PIL.Image.open(fn))
 
         for k, v in map_def.iteritems():
+            if isinstance(v, dict):
+                v = AttrDict(v)
             setattr(self, k, v)
+
         print "done."
 
     def save_rgb_map_in_png(self, fn):
@@ -155,6 +203,9 @@ class OffRoadMap(object):
             & (iy >= b.y_min) & (iy <= b.y_max - 1)
         return inside
 
+    def get_xy(self, ix, iy):
+        return (ix + 0.5) * self.cell_size, (iy + 0.5) * self.cell_size
+
     def get_ixiy(self, x, y):
         ix = np.floor(x / self.cell_size).astype(np.int32)
         iy = np.floor(y / self.cell_size).astype(np.int32)
@@ -170,6 +221,6 @@ class Rewarder(object):
     def eval(self, state):
 
         reward = 0
-        for obj in self.map.interactables:
+        for obj in self.map.get_interactables():
             reward += obj.react(state)
         return reward

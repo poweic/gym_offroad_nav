@@ -57,3 +57,6 @@ class Viewer(object):
 
     def add(self, obj):
         self.local_frame.add_geom(obj)
+
+    def clear(self):
+        self.local_frame.geoms = []

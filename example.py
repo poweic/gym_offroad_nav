@@ -4,7 +4,12 @@ import gym
 import gym_offroad_nav.envs
 import numpy as np
 import time
-import drl.logger
+try:
+    # import my logger from https://bitbucket.org/castacks/deep_rl
+    import drl.logger
+except:
+    # but it's optional, just ignore this
+    pass
 
 env = gym.make("OffRoadNav-v0")
 # All the default_options are defined in gym_offroad_nav/envs/offroad_nav_env.py

@@ -56,8 +56,11 @@ class Timer(object):
         if self.counter % self.timer.maxlen == 0:
             self.counter = 0
 
-            import tensorflow as tf
-            tf.logging.set_verbosity(tf.logging.INFO)
-            tf.logging.info("average time of {} = {:.2f} ms".format(
-                self.message, np.mean(self.timer) * 1000
-            ))
+            try:
+                import tensorflow as tf
+                tf.logging.set_verbosity(tf.logging.INFO)
+                tf.logging.info("average time of {} = {:.2f} ms".format(
+                    self.message, np.mean(self.timer) * 1000
+                ))
+            except:
+                pass

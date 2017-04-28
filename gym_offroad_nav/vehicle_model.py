@@ -5,7 +5,7 @@ from gym_offroad_nav.utils import dirname
 
 class VehicleModel():
 
-    def __init__(self, timestep, wheelbase=2.0, drift=False):
+    def __init__(self, timestep, noise_level=0., wheelbase=2.0, drift=False):
 
         # Load vehicle model ABCD
         current_dir = dirname(__file__)
@@ -17,8 +17,10 @@ class VehicleModel():
 
         #
         self.timestep = timestep
+        self.noise_level = noise_level
         self.wheelbase = wheelbase
         self.drift = drift
+        self.rng = np.random.RandomState()
 
         if not drift:
             self.A[0][0] = 0
@@ -39,6 +41,9 @@ class VehicleModel():
         # x' = Ax + Bu (prediction)
         # y' = Cx + Du (measurement)
         self.x = None
+
+    def seed(self, rng):
+        self.rng = rng
 
     def _predict(self, x, u):
         u = u.reshape(2, -1)
@@ -82,6 +87,10 @@ class VehicleModel():
 
         # dx = v * dt
         delta = V * self.timestep
+
+        # Add some noise using delta * (1 + noise) instead of delta + noise
+        white_noise = self.rng.randn(*delta.shape)
+        delta *= 1 + white_noise * self.noise_level
 
         # x2 = x1 + dx
         state[0:3] += delta

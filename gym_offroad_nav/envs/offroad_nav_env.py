@@ -30,6 +30,7 @@ class OffRoadNavEnv(gym.Env):
         'max_mu_steer': +30 * np.pi / 180,
         'timestep': 0.025,
         'odom_noise_level': 0.02,
+        'vm_noise_level': 0.02,
         'wheelbase': 2.0,
         'map_def': 'map7',
         'command_freq': 5,
@@ -73,10 +74,13 @@ class OffRoadNavEnv(gym.Env):
 
         """
         self.vehicle_model_gpu = VehicleModelGPU(
-            self.opts.timestep, self.opts.wheelbase, self.opts.drift)
+            self.opts.timestep, self.opts.vm_noise_level,
+            self.opts.wheelbase, self.opts.drift
+        )
         """
         self.vehicle_model = VehicleModel(
-            self.opts.timestep, self.opts.wheelbase, self.opts.drift
+            self.opts.timestep, self.opts.vm_noise_level,
+            self.opts.wheelbase, self.opts.drift
         )
 
         self.state = np.zeros((6, self.opts.n_agents_per_worker), dtype=np.float32)
@@ -146,6 +150,7 @@ class OffRoadNavEnv(gym.Env):
     def _seed(self, seed=None):
         self.rng, seed = seeding.np_random(seed)
         self.map.seed(self.rng)
+        self.vehicle_model.seed(self.rng)
         for sensor in self.sensors.itervalues():
             sensor.seed(self.rng)
         return [seed]

@@ -5,9 +5,10 @@ FLAGS = tf.flags.FLAGS
 
 class VehicleModelGPU():
 
-    def __init__(self, timestep, wheelbase=2.0, drift=False):
+    def __init__(self, timestep, noise_level=0., wheelbase=2.0, drift=False):
 
         self.timestep = timestep
+        self.noise_level = noise_level
         self.wheelbase = wheelbase
         self.drift = drift
 
@@ -82,6 +83,7 @@ class VehicleModelGPU():
         C = tf.constant(self.C, self.dtype)
         D = tf.constant(self.D, self.dtype)
         timestep = tf.constant(self.timestep, self.dtype)
+        noise_level = tf.constant(self.noise_level, self.dtype)
 
         def cond(i, state_i, x_i):
             return i >= 0
@@ -109,6 +111,10 @@ class VehicleModelGPU():
             omega = state_i[5]
 
             delta = tf.stack([vx, vy, omega], axis=0) * timestep
+
+            # Add some noise using delta * (1 + noise) instead of delta + noise
+            white_noise = tf.random_normal(tf.shape(delta), dtype=self.dtype)
+            delta *= 1 + white_noise * noise_level
 
             state_i = tf.concat([state_i[0:3] + delta, y], axis=0)
 

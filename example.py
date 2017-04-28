@@ -1,9 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import cv2
 import gym
 import gym_offroad_nav.envs
 import numpy as np
 import time
+import drl.logger
 
 env = gym.make("OffRoadNav-v0")
 # All the default_options are defined in gym_offroad_nav/envs/offroad_nav_env.py

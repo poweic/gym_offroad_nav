@@ -17,6 +17,8 @@ from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
 from gym_offroad_nav.viewer import Viewer
 from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
+DEG2RAD = np.pi / 180.
+
 class OffRoadNavEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'], # 'video.frames_per_second': 30
@@ -26,11 +28,12 @@ class OffRoadNavEnv(gym.Env):
         'field_of_view': 64,
         'min_mu_vf': -14. / 3.6,
         'max_mu_vf': +14. / 3.6,
-        'min_mu_steer': -30 * np.pi / 180,
-        'max_mu_steer': +30 * np.pi / 180,
+        'min_mu_steer': -30 * DEG2RAD,
+        'max_mu_steer': +30 * DEG2RAD,
         'timestep': 0.025,
         'odom_noise_level': 0.02,
         'vm_noise_level': 0.02,
+        'initial_pose_noise': [1, 1, 5 * DEG2RAD, 0.5, 0, 5 * DEG2RAD],
         'wheelbase': 2.0,
         'map_def': 'map7',
         'command_freq': 5,
@@ -99,8 +102,6 @@ class OffRoadNavEnv(gym.Env):
         self.observation_space = spaces.Tuple((
             self.sensors['front_view'].get_obs_space(),
             self.sensors['vehicle_state'].get_obs_space(),
-            # spaces.Box(low=0, high=255, shape=(fov, fov, 5)),
-            # spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
 
         # TrajectoryFitter
@@ -240,10 +241,12 @@ class OffRoadNavEnv(gym.Env):
         # Reshape to compatiable format
         state = state.astype(np.float32).reshape(6, -1)
 
-        # Add some noise to have diverse start points
-        noise = self.rng.randn(6, self.opts.n_agents_per_worker).astype(np.float32) * 0.5
-        noise[2, :] /= 10
+        # Generate some noise to have diverse start points
+        noise = self.rng.randn(6, self.opts.n_agents_per_worker)
+        scale = np.array(self.opts.initial_pose_noise)[..., None]
+        noise = (noise * scale).astype(np.float32)
 
+        # Add noise to state
         state = state + noise
 
         return state

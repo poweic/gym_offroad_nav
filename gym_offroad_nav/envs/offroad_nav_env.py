@@ -30,7 +30,7 @@ class OffRoadNavEnv(gym.Env):
         'timestep': 0.025,
         'odom_noise_level': 0.02,
         'wheelbase': 2.0,
-        'map_def': 'map6',
+        'map_def': 'map7',
         'command_freq': 5,
         'n_agents_per_worker': 32,
         'viewport_scale': 4,
@@ -156,7 +156,7 @@ class OffRoadNavEnv(gym.Env):
         info = AttrDict()
 
         # compute reward based on new_state
-        info.reward = self.rewarder.eval(new_state) - crashed * 100
+        info.reward = self.rewarder.eval(new_state) - crashed * self.map.crash_penalty
         self.total_reward += info.reward
         reward = np.mean(info.reward)
 

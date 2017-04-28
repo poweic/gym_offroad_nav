@@ -78,6 +78,7 @@ class Vehicle(rendering.Geom):
 
         self.size = size
         self.keep_trace = keep_trace
+        self.draw_horizon = draw_horizon
         self.max_trace_length = max_trace_length
         self.discount_factor = discount_factor
         self.time_per_step = time_per_step
@@ -132,7 +133,7 @@ class Vehicle(rendering.Geom):
 
         self.polyline.render()
 
-        if draw_horizon:
+        if self.draw_horizon:
             self.get_horizon().render()
 
         for p in self.trace:

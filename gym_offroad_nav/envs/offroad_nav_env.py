@@ -146,6 +146,9 @@ class OffRoadNavEnv(gym.Env):
         for j in range(self.n_sub_steps):
             new_state = self.vehicle_model.predict(new_state, action)
 
+        self.timer.vehicle_model.toc()
+
+        self.timer.others.tic()
         # See if the car is in tree. If the speed is too high, then it's crashed
         in_tree = self.map.in_tree(new_state)
         crashed = in_tree & (get_speed(new_state) > 1.)
@@ -153,7 +156,6 @@ class OffRoadNavEnv(gym.Env):
         info = AttrDict()
 
         # compute reward based on new_state
-        self.timer.others.tic()
         info.reward = self.rewarder.eval(new_state) - crashed * 100
         self.total_reward += info.reward
         reward = np.mean(info.reward)
@@ -164,8 +166,6 @@ class OffRoadNavEnv(gym.Env):
         self.vehicle_model.reset(new_state, in_tree)
 
         self.state[:] = new_state[:]
-
-        self.timer.vehicle_model.toc()
 
         # Determine whether it's done
         x, y = self.state[:2]

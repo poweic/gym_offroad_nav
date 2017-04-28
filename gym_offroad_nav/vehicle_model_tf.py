@@ -5,17 +5,17 @@ FLAGS = tf.flags.FLAGS
 
 class VehicleModelGPU():
 
-    def __init__(self, timestep, noise_level=0., drift=False):
+    def __init__(self, timestep, wheelbase=2.0, drift=False):
+
         self.timestep = timestep
-        self.noise_level = noise_level
+        self.wheelbase = wheelbase
         self.drift = drift
+
         self.init_ABCD()
 
-        batch_size = FLAGS.batch_size
-
-        self.state  = tf.placeholder(self.dtype, [6, batch_size])
-        self.u      = tf.placeholder(self.dtype, [2, batch_size])
-        self.x_0    = tf.placeholder(self.dtype, [4, batch_size])
+        self.state  = tf.placeholder(self.dtype, [6, None])
+        self.u      = tf.placeholder(self.dtype, [2, None])
+        self.x_0    = tf.placeholder(self.dtype, [4, None])
         self.steps = tf.placeholder(tf.int32, [])
 
         self.predict_op = self.create_predict_op(
@@ -29,6 +29,12 @@ class VehicleModelGPU():
         # y' = Cx + Du (measurement)
         self.x = None
 
+    def steer_to_yawrate(self, state, steer):
+        vf = state[4]
+        vf = tf.sign(vf) * tf.maximum(tf.abs(vf), 1e-3)
+        yawrate = vf * tf.tan(steer) / self.wheelbase
+        return yawrate
+
     def init_ABCD(self):
 
         # Load ABCD, and then store in tf.constant
@@ -38,7 +44,7 @@ class VehicleModelGPU():
         self.C = model["C"]
         self.D = model["D"]
 
-        self.dtype = tf.float64
+        self.dtype = tf.float32
 
         if not self.drift:
             self.A[0][0] = 0
@@ -76,14 +82,16 @@ class VehicleModelGPU():
         C = tf.constant(self.C, self.dtype)
         D = tf.constant(self.D, self.dtype)
         timestep = tf.constant(self.timestep, self.dtype)
-        noise_level = tf.constant(self.noise_level, self.dtype)
 
-        def cond(i, state_i, xu_):
+        def cond(i, state_i, x_i):
             return i >= 0
 
         def body(i, state_i, x_i):
-            y   = tf.matmul(C, x_i) + tf.matmul(D, u)
-            x_i = tf.matmul(A, x_i) + tf.matmul(B, u)
+
+            actions = tf.concat([u[0:1], self.steer_to_yawrate(state_i, u[1:2])], axis=0)
+
+            y   = tf.matmul(C, x_i) + tf.matmul(D, actions)
+            x_i = tf.matmul(A, x_i) + tf.matmul(B, actions)
 
             # x_i = tf.Print(x_i, [x_i, y], "x_i, y = ")
 
@@ -100,11 +108,9 @@ class VehicleModelGPU():
             vy = s * vx_ + c * vy_
             omega = state_i[5]
 
-            delta = tf.pack([vx, vy, omega], axis=0) * timestep
-            # delta = tf.Print(delta, [delta], 'delta = ')
-            delta *= 1 + tf.random_uniform(tf.shape(delta), dtype=self.dtype) * noise_level
+            delta = tf.stack([vx, vy, omega], axis=0) * timestep
 
-            state_i = tf.concat(0, [state_i[0:3] + delta, y])
+            state_i = tf.concat([state_i[0:3] + delta, y], axis=0)
 
             return i-1, state_i, x_i
 
@@ -119,3 +125,4 @@ class VehicleModelGPU():
         # extract the last 3 elements from state
         y0 = state[3:6].reshape(3, -1)
         self.x = np.dot(np.linalg.pinv(self.C), y0)
+        print "self.x.shape = ", self.x.shape

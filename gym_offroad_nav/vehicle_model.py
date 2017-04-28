@@ -56,6 +56,7 @@ class VehicleModel():
         if self.x is None:
             raise ValueError("self.x is still None. Call reset() first.")
 
+        # assumming all are column-vector
         assert state.shape[0] == 6, "state.shape = {}".format(state.shape)
         assert action.shape[0] == 2, "action.shape = {}".format(action.shape)
         assert self.x.shape[0] == 4, "self.x.shape = {}".format(self.x.shape)

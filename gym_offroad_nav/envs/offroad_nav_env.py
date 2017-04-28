@@ -83,6 +83,8 @@ class OffRoadNavEnv(gym.Env):
         )
         self.dof = np.prod(self.action_space.shape)
 
+        self.n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
+
         # observation_space is automatically deduced from sensors
         self.observation_space = spaces.Tuple((
             self.sensors['front_view'].get_obs_space(),
@@ -140,9 +142,8 @@ class OffRoadNavEnv(gym.Env):
 
         self.timer.vehicle_model.tic()
         action = action.reshape(self.dof, self.opts.n_agents_per_worker)
-        n_sub_steps = int(1. / self.opts.command_freq / self.opts.timestep)
         new_state = self.state.copy()
-        for j in range(n_sub_steps):
+        for j in range(self.n_sub_steps):
             new_state = self.vehicle_model.predict(new_state, action)
 
         # See if the car is in tree. If the speed is too high, then it's crashed
@@ -170,10 +171,6 @@ class OffRoadNavEnv(gym.Env):
         x, y = self.state[:2]
         info.done = ~self.map.contains(x, y) | crashed
         done = np.any(info.done)
-
-        # FIXME cannot use total_reward as terminal criteria, because this
-        # means there's no way an agent can change it's destiny
-        # done |= (self.total_reward < self.map.minimum_score).squeeze()
 
         self.timer.others.toc()
 

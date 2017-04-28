@@ -60,7 +60,7 @@ class OffRoadNavEnv(gym.Env):
         self.initialized = False
 
         # Load map definition from YAML file from configuration file
-        self.map = OffRoadMap(self.opts.map_def)
+        self.map = OffRoadMap(self.opts.map_def, self.opts.n_agents_per_worker)
 
         # A matrix containing rewards, we need a constant version and 
         self.rewarder = Rewarder(self.map)

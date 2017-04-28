@@ -35,10 +35,11 @@ def load_rewards(track):
     return rewards
 
 class OffRoadMap(object):
-    def __init__(self, map_def):
+    def __init__(self, map_def, n_agents_per_worker):
 
         # Load map definition from YAML file and store values as self attributes
         self.load_map_def(map_def)
+        self.n_agents_per_worker = n_agents_per_worker
 
         self._init_boundary()
 
@@ -98,12 +99,19 @@ class OffRoadMap(object):
 
         waypoints = np.array([x, y]).T
 
-        w0 = waypoints[0]
-        w1 = waypoints[10] # don't use waypoints[1], becuase it's only 1px diff
+        step = int(len(waypoints) * 0.70 / self.n_agents_per_worker)
 
-        dx, dy = w1 - w0
-        theta = np.arctan2(dy, dx) - np.pi / 2
-        initial_pose = [w0[0], w0[1], theta, 0, 0, 0]
+        initial_pose = np.zeros((6, self.n_agents_per_worker))
+        for i in range(self.n_agents_per_worker):
+
+            # w0 is the start point, w1 is used to determine the initial angle
+            # use step*i + 5 instead of +1 because +1 is just 1px away
+            w0 = waypoints[step*i]
+            w1 = waypoints[step*i+5]
+
+            dx, dy = w1 - w0
+            theta = np.arctan2(dy, dx) - np.pi / 2
+            initial_pose[:, i] = [w0[0], w0[1], theta, 0, 0, 0]
 
         return waypoints, initial_pose
 

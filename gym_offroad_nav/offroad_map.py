@@ -73,11 +73,13 @@ class OffRoadMap(object):
         reward = self.waypoint.reward
         goal_r = self.waypoint.goal_reward
 
+        # downsample the waypoints by 10 so that coins won't be too crowded.
+        # Also, skip the first waypoint, since it's the start point
         self.dynamic_objects = [
             Coin(
                 map=map, position=waypoint, radius=radius,
                 reward=reward + goal_r * (i == len(self.waypoints) - 1)
-            ) for i, waypoint in enumerate(self.waypoints)
+            ) for i, waypoint in enumerate(self.waypoints[1::10])
         ]
 
     def get_interactables(self):
@@ -96,15 +98,12 @@ class OffRoadMap(object):
 
         waypoints = np.array([x, y]).T
 
-        # downsample so that coins won't be too crowded
-        waypoints = waypoints[::10]
+        w0 = waypoints[0]
+        w1 = waypoints[10] # don't use waypoints[1], becuase it's only 1px diff
 
-        dx, dy = waypoints[1] - waypoints[0]
+        dx, dy = w1 - w0
         theta = np.arctan2(dy, dx) - np.pi / 2
-        initial_pose = [waypoints[0][0], waypoints[0][1], theta, 0, 0, 0]
-
-        # Skip the first waypoint, since it's the start point
-        waypoints = waypoints[1:]
+        initial_pose = [w0[0], w0[1], theta, 0, 0, 0]
 
         return waypoints, initial_pose
 
@@ -162,6 +161,7 @@ class OffRoadMap(object):
         for c in classes:
             rewards[labels == c] = self.class_id_to_rewards[c]
         print "done."
+
         return rewards
 
     def get_class(self, x, y):

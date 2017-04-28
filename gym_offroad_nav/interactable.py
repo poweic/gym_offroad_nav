@@ -1,4 +1,5 @@
 import abc
+import cv2
 import numpy as np
 from copy import deepcopy
 from collections import deque
@@ -121,6 +122,10 @@ class OffRoadScene(Interactable):
     def __init__(self, *args, **kwargs):
         super(OffRoadScene, self).__init__(**kwargs)
 
+        sigma = 3
+        # blur the reward map to get a more continuous (smoother) reward
+        self.rewards = cv2.GaussianBlur(self.map.rewards, (sigma, sigma), 0)
+
     def react(self, state):
         x, y = state[:2]
         r = self._bilinear_reward_lookup(x, y)
@@ -166,10 +171,10 @@ class OffRoadScene(Interactable):
 
     def _get_reward(self, ix, iy):
         bounds = self.map.bounds
-        r = self.map.rewards[bounds.y_max - 1 - iy, ix - bounds.x_min]
+        r = self.rewards[bounds.y_max - 1 - iy, ix - bounds.x_min]
 
         # this is legacy code, make sure I didn't break it
         linear_idx = (bounds.y_max - 1 - iy) * self.map.width + (ix - bounds.x_min)
-        assert np.all(r == self.map.rewards.flatten()[linear_idx])
+        assert np.all(r == self.rewards.flatten()[linear_idx])
 
         return r

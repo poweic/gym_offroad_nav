@@ -72,14 +72,18 @@ class Coin(Interactable, rendering.Geom):
         self.coin_radius.render()
 
 class Vehicle(rendering.Geom):
-    def __init__(self, pose, size=2., keep_trace=False, max_trace_length=100):
+    def __init__(self, pose, size=2., keep_trace=False, draw_horizon=False,
+                 max_trace_length=100, time_per_step=1., discount_factor=0.99):
         super(Vehicle, self).__init__()
 
         self.size = size
         self.keep_trace = keep_trace
+        self.max_trace_length = max_trace_length
+        self.discount_factor = discount_factor
+        self.time_per_step = time_per_step
 
         # pose of vehicle (translation + rotation)
-        self.transform = rendering.Transform2D(pose=pose[:3])
+        self.transform = rendering.Transform2D(pose=pose)
 
         # vertices of vehicles
         h, w = size, size / 2
@@ -87,6 +91,9 @@ class Vehicle(rendering.Geom):
         vertices = [(l,b), (l,t), (r,t), (r,b), (0, 0), (l, b), (r, b)]
         self.polyline = rendering.PolyLine(vertices, close=False)
         self.polyline.attrs = [rendering.Color((1, 0, 0, 1)), self.transform]
+
+        # draw horizon (based on discount_factor) as a circle
+        self.k_steps_5_percent = np.log(0.05) / np.log(discount_factor)
 
         # trace of vehicle (historical poses)
         self.trace = deque(maxlen=max_trace_length)
@@ -99,21 +106,35 @@ class Vehicle(rendering.Geom):
         else:
             return super(Vehicle, self).__setattr__(name, value)
 
+    '''
     def set_pose(self, pose):
         # pose is a 6-dimensional vector (x, y, theta, x', y', theta')
-        self.transform.set_pose(pose[:3])
+        self.transform.set_pose(pose)
+    '''
 
+    def reset(self, pose=[0., 0., 0., 0., 0., 0.]):
+        self.trace.clear()
+
+    def get_horizon(self):
+
+        speed = np.linalg.norm(self.transform.pose[3:5])
+        radius = self.k_steps_5_percent * speed * self.time_per_step
+        horizon = rendering.make_circle(radius, filled=False)
+        horizon.attrs = [rendering.Color((0.3, 0.77, 1, 1)), self.transform]
+
+        return horizon
+
+    def render1(self):
         if self.keep_trace:
             p = rendering.Point()
             p.attrs = [rendering.Color((1, 0, 0, 1)), deepcopy(self.transform)]
             self.trace.append(p)
 
-    def reset(self, pose=[0., 0., 0.]):
-        self.trace.clear()
-        self.set_pose(pose)
-
-    def render1(self):
         self.polyline.render()
+
+        if draw_horizon:
+            self.get_horizon().render()
+
         for p in self.trace:
             p.render()
 

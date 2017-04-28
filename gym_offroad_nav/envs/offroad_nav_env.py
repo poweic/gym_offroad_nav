@@ -36,6 +36,7 @@ class OffRoadNavEnv(gym.Env):
         'command_freq': 5,
         'n_agents_per_worker': 32,
         'viewport_scale': 4,
+        'discount_factor': 0.99,
         'max_steps': 100,
         'drift': False
     }
@@ -251,7 +252,11 @@ class OffRoadNavEnv(gym.Env):
         from gym_offroad_nav.interactable import Vehicle
 
         self.vehicles = [
-            Vehicle(pose=self.state.T[i], keep_trace=True)
+            Vehicle(
+                pose=self.state.T[i], keep_trace=False, draw_horizon=False,
+                time_per_step=1. / self.opts.command_freq,
+                discount_factor=self.opts.discount_factor
+            )
             for i in range(self.opts.n_agents_per_worker)
         ]
 
@@ -262,6 +267,9 @@ class OffRoadNavEnv(gym.Env):
         # self.vehicle_model_gpu.reset(s0)
 
         self.state[:] = s0[:]
+        for vehicle in self.vehicles:
+            vehicle.reset()
+
         self.total_reward = 0
         self.steps = 0
 

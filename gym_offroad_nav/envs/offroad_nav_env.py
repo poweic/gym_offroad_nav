@@ -15,6 +15,7 @@ from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model import VehicleModel
 from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
 from gym_offroad_nav.viewer import Viewer
+from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
 class OffRoadNavEnv(gym.Env):
     metadata = {
@@ -39,6 +40,7 @@ class OffRoadNavEnv(gym.Env):
     }
 
     def __init__(self):
+        # self.max_l2_norm = 0
         self.opts = AttrDict(self.default_options)
         self.opts.update(get_options_from_TF_flags(self.opts.keys()))
         self.initialize()
@@ -69,7 +71,10 @@ class OffRoadNavEnv(gym.Env):
             'front_view': FrontViewer(self.map, self.opts.field_of_view)
         }
 
-        # self.vehicle_model_gpu = VehicleModelGPU(...)
+        """
+        self.vehicle_model_gpu = VehicleModelGPU(
+            self.opts.timestep, self.opts.wheelbase, self.opts.drift)
+        """
         self.vehicle_model = VehicleModel(
             self.opts.timestep, self.opts.wheelbase, self.opts.drift
         )
@@ -93,6 +98,17 @@ class OffRoadNavEnv(gym.Env):
             # spaces.Box(low=float_min, high=float_max, shape=(6, 1))
         ))
 
+        # TrajectoryFitter
+        # use default session if exists, create on otherwise
+        """
+        import tensorflow as tf
+        self.sess = tf.get_default_session() or tf.Session()
+        self.traj_fitter = TrajectoryFitter(
+            sess=self.sess, vehicle_model=self.vehicle_model,
+            margin=0.5, n_steps=self.n_sub_steps
+        )
+        """
+
         # Rendering
         self.viewer = Viewer(self)
 
@@ -107,6 +123,19 @@ class OffRoadNavEnv(gym.Env):
             get_obs=Timer("get_obs"),
             others=Timer("contains + reward")
         )
+
+    def fit(self):
+        waypoints = self.map.waypoints[2::2, None, :]
+        print waypoints.shape
+
+        s_target = np.repeat(waypoints, [self.opts.n_agents_per_worker], axis=1)
+        s_target = np.pad(s_target, [[0, 0], [0, 0], [0, 4]], 'constant')
+        s_target = np.concatenate([self.state.T[None], s_target])
+        print s_target.shape
+
+        loss, actions = self.traj_fitter.fit(s_target)
+
+        return actions
 
     def sample_action(self):
         return np.concatenate([
@@ -143,10 +172,21 @@ class OffRoadNavEnv(gym.Env):
         self.timer.vehicle_model.tic()
         action = action.reshape(self.dof, self.opts.n_agents_per_worker)
         new_state = self.state.copy()
+        # new_state_gpu = self.state.copy()
+
         for j in range(self.n_sub_steps):
             new_state = self.vehicle_model.predict(new_state, action)
 
         self.timer.vehicle_model.toc()
+        """
+        new_state_gpu = self.vehicle_model_gpu.predict(new_state_gpu, action, self.n_sub_steps, self.sess)
+        diff = new_state - new_state_gpu
+        l2norm = np.linalg.norm(diff.flatten())
+        self.max_l2_norm = max(l2norm, self.max_l2_norm)
+        print "L2 norm = {:12.7e}, allclose = {}, max_l2_norm = {:12.7e}".format(
+            l2norm, np.allclose(new_state, new_state_gpu), self.max_l2_norm
+        )
+        """
 
         self.timer.others.tic()
         # See if the car is in tree. If the speed is too high, then it's crashed
@@ -214,6 +254,7 @@ class OffRoadNavEnv(gym.Env):
         self.map.reset()
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
+        # self.vehicle_model_gpu.reset(s0)
 
         self.state[:] = s0[:]
         self.total_reward = 0

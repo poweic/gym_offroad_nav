@@ -2,6 +2,7 @@ import os
 import scipy.io
 import numpy as np
 from gym_offroad_nav.utils import dirname
+from gym_offroad_nav.vehicle_model.cython_impl import c_step
 
 class VehicleModel():
 
@@ -29,8 +30,8 @@ class VehicleModel():
 
         # x = Ax + Bu, y = Cx + Du
         # Turn cm/s, degree/s to m/s and rad/s
-        Q = np.diag([100., 180./np.pi]).astype(np.float32)
-        Qinv = np.diag([0.01, 0.01, np.pi/180.]).astype(np.float32)
+        Q = np.diag([100., 180./np.pi])
+        Qinv = np.diag([0.01, 0.01, np.pi/180.])
         self.B = self.B.dot(Q)
         self.C = Qinv.dot(self.C)
         self.D = Qinv.dot(self.D).dot(Q)
@@ -53,11 +54,25 @@ class VehicleModel():
 
     def steer_to_yawrate(self, state, steer):
         vf = state[4]
-        vf = np.sign(vf) * np.maximum(np.abs(vf), 1e-3)
         yawrate = vf * np.tan(steer) / self.wheelbase
         return yawrate
 
-    def predict(self, state, action):
+    def predict(self, state, action, n_sub_steps):
+
+        batch_size = state.shape[1]
+        noise = self.rng.randn(n_sub_steps, 3, batch_size)
+        action = action.astype(np.float64, order='C')
+
+        # c_step implicitly ASSUME x, state, action, noise are contiguous array
+        # with row-major memory layout (i.e. order='C')
+        c_step(
+            self.x, state, action, noise, n_sub_steps, batch_size,
+            self.timestep, self.noise_level, self.wheelbase, float(self.drift)
+        )
+
+        return state
+
+    def predict_old(self, state, action):
         if self.x is None:
             raise ValueError("self.x is still None. Call reset() first.")
 
@@ -71,7 +86,7 @@ class VehicleModel():
 
         # y = state[3:6]
         y, self.x = self._predict(self.x, action)
-        
+
         # theta is in radian
         theta = state[2]
 

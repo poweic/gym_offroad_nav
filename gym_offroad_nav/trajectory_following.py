@@ -2,8 +2,8 @@
 import numpy as np
 import tensorflow as tf
 from attrdict import AttrDict
-from gym_offroad_nav.vehicle_model import VehicleModel
-from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
+from gym_offroad_nav.vehicle_model.numpy_impl import VehicleModel
+from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
 import itertools
 import scipy.optimize
 

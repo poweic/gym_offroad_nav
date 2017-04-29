@@ -12,8 +12,8 @@ from attrdict import AttrDict
 from gym_offroad_nav.utils import get_options_from_TF_flags, Timer, get_speed
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
-from gym_offroad_nav.vehicle_model import VehicleModel
-from gym_offroad_nav.vehicle_model_tf import VehicleModelGPU
+from gym_offroad_nav.vehicle_model.numpy_impl import VehicleModel
+from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
 from gym_offroad_nav.viewer import Viewer
 from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
@@ -32,7 +32,7 @@ class OffRoadNavEnv(gym.Env):
         'max_mu_steer': +30 * DEG2RAD,
         'timestep': 0.025,
         'odom_noise_level': 0.02,
-        'vm_noise_level': 0.02,
+        'vm_noise_level': 0, #0.02,
         'initial_pose_noise': [1, 1, 5 * DEG2RAD, 0.5, 0, 5 * DEG2RAD],
         'wheelbase': 2.0,
         'map_def': 'map7',
@@ -87,7 +87,7 @@ class OffRoadNavEnv(gym.Env):
             self.opts.wheelbase, self.opts.drift
         )
 
-        self.state = np.zeros((6, self.opts.n_agents_per_worker), dtype=np.float32)
+        self.state = np.zeros((6, self.opts.n_agents_per_worker))
 
         # action space = forward velocity + steering angle
         self.action_space = spaces.Box(
@@ -159,7 +159,7 @@ class OffRoadNavEnv(gym.Env):
 
     def _get_obs(self):
         return AttrDict({
-            k: sensor.eval(self.state) for k, sensor in self.sensors.iteritems()
+            k: sensor.eval(self.state).astype(np.float32) for k, sensor in self.sensors.iteritems()
         })
 
     def _step(self, action):
@@ -181,10 +181,15 @@ class OffRoadNavEnv(gym.Env):
         new_state = self.state.copy()
         # new_state_gpu = self.state.copy()
 
+        new_state = self.vehicle_model.predict(new_state, action, self.n_sub_steps)
+        """
         for j in range(self.n_sub_steps):
             new_state = self.vehicle_model.predict(new_state, action)
 
+        """
         self.timer.vehicle_model.toc()
+
+
         """
         new_state_gpu = self.vehicle_model_gpu.predict(new_state_gpu, action, self.n_sub_steps, self.sess)
         diff = new_state - new_state_gpu
@@ -239,12 +244,12 @@ class OffRoadNavEnv(gym.Env):
         state = np.array(self.map.initial_pose)
 
         # Reshape to compatiable format
-        state = state.astype(np.float32).reshape(6, -1)
+        state = state.reshape(6, -1)
 
         # Generate some noise to have diverse start points
         noise = self.rng.randn(6, self.opts.n_agents_per_worker)
         scale = np.array(self.opts.initial_pose_noise)[..., None]
-        noise = (noise * scale).astype(np.float32)
+        noise = noise * scale
 
         # Add noise to state
         state = state + noise

@@ -4,11 +4,12 @@ class_id_to_class_name:
   1: 'smooth trail'
   2: 'low vegetation (traversable, drive cautiously, despite geometry)'
   3: 'slow down'
-  4: 'water (not traversable, despite geometry)'
+  4: 'water, puddle, mud (barely traversable, despite geometry)'
   5: 'obstacles (non traversable)'
   6: 'bushes (non traversable)'
   7: 'tree (non traversable)}'
-class_id_to_rewards: [0.0, 0.0001, -0.07, -0.02, -0.05, -1.0, -0.95, -1.0]
+traversable: [True, True, True, True, True, False, False, False]
+class_id_to_rewards: [0.0, 0.01, -0.07, -0.02, -0.05, -1.0, -0.95, -1.0]
 class_id_to_rgb:
   0: [255, 255, 255]
   1: [178, 176, 153]
@@ -20,8 +21,17 @@ class_id_to_rgb:
   7: [40, 80, 0]
 map_structure_filename: "map8.png"
 trail_skeleton_filename: "map8-skel.png"
-crash_penalty: 50.
+# penalty for crash and impact doesn't have to be [-1, 1]
+crash_penalty: 100.
+impact_penalty: 10.
+# other kinds of penalties should be roughly around [-1, 1]
+reverse_penalty: 0.000
+# low_speed_penalty_function: "lambda x: 0.5 * np.exp(-1.0 * np.abs(x)) * (x < 3.) * (x > 0)" #  8, 14 minutes (see below)
+low_speed_penalty_function: "lambda x: 0.1 * np.exp(-3.0 * np.abs(x)) * (x < 3.) * (x > 0)" #  14+ minutes and counting (max rewards = 36+)
 waypoint:
   radius: 2.0
-  reward: 1.0
+  reward: 10.0
+  distance_between: 5 # in meters
+  # 5 meters will DIVERGE at  8 minutes mark. (max reward = 5 ) No idea why...
+  # 8 meters will DIVERGE at 14 minutes mark. (max reward = 20) No idea why...
   goal_reward: 0

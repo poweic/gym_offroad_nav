@@ -33,26 +33,36 @@ for i in range(1000):
 
     total_return = 0
 
+    '''
+    actions = env.env.fit()
+    cv2.waitKey(0)
+    '''
+
+    i = 0
     while not np.any(done):
+        '''
+        if i >= len(actions): break
+        action = actions[i]
+        '''
         # sample actions for agents
         action = env.env.sample_action()
 
         # Change speed command so that it's more diverse (for debugging purpose)
         # action[0] *= np.arange(len(action[0])).astype(np.float) / 10
         action[0] = 5
-        action[1] *= 0
 
         # step in the environment
         state, reward, done, _ = env.step(action.squeeze())
 
         # collect the reward
         total_return += reward
-        print "total_return = {}".format(total_return)
+        # print "total_return = {}".format(total_return)
 
         # refresh OpenGL renderer
         env.render()
 
         # (optinal) if you want to slow it down
         # cv2.waitKey(0)
+        i += 1
 
-    print "\n"
+    # print "\n"

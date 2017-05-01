@@ -32,13 +32,13 @@ class OffRoadNavEnv(gym.Env):
         'max_mu_steer': +30 * DEG2RAD,
         'timestep': 0.025,
         'odom_noise_level': 0.02,
-        'vm_noise_level': 0, #0.02,
-        'initial_pose_noise': [1, 1, 5 * DEG2RAD, 0.5, 0, 5 * DEG2RAD],
+        'vehicle_model_noise_level': 0.02,
+        'initial_pose_noise': [0, 0, 5 * DEG2RAD, 0.5, 0, 5 * DEG2RAD],
         'wheelbase': 2.0,
-        'map_def': 'map7',
+        'map_def': 'map8',
         'command_freq': 5,
         'n_agents_per_worker': 32,
-        'viewport_scale': 4,
+        'viewport_scale': 2,
         'discount_factor': 0.99,
         'max_steps': 100,
         'drift': False
@@ -78,12 +78,12 @@ class OffRoadNavEnv(gym.Env):
 
         """
         self.vehicle_model_gpu = VehicleModelGPU(
-            self.opts.timestep, self.opts.vm_noise_level,
+            self.opts.timestep, self.opts.vehicle_model_noise_level,
             self.opts.wheelbase, self.opts.drift
         )
         """
         self.vehicle_model = VehicleModel(
-            self.opts.timestep, self.opts.vm_noise_level,
+            self.opts.timestep, self.opts.vehicle_model_noise_level,
             self.opts.wheelbase, self.opts.drift
         )
 

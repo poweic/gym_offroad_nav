@@ -76,11 +76,12 @@ class OffRoadMap(object):
 
         # downsample the waypoints by 10 so that coins won't be too crowded.
         # Also, skip the first waypoint, since it's the start point
+        step = int(self.waypoint.distance_between / self.cell_size)
         self.dynamic_objects = [
             Coin(
                 map=map, position=waypoint, radius=radius,
                 reward=reward + goal_r * (i == len(self.waypoints) - 1)
-            ) for i, waypoint in enumerate(self.waypoints[1::10])
+            ) for i, waypoint in enumerate(self.waypoints[1::step])
         ]
 
     def get_interactables(self):
@@ -99,15 +100,16 @@ class OffRoadMap(object):
 
         waypoints = np.array([x, y]).T
 
-        step = int(len(waypoints) * 0.70 / self.n_agents_per_worker)
+        half = int(self.n_agents_per_worker / 2)
+        step = int(len(waypoints) * 0.70 / half)
 
         initial_pose = np.zeros((6, self.n_agents_per_worker))
         for i in range(self.n_agents_per_worker):
 
             # w0 is the start point, w1 is used to determine the initial angle
             # use step*i + 5 instead of +1 because +1 is just 1px away
-            w0 = waypoints[step*i]
-            w1 = waypoints[step*i+5]
+            w0 = waypoints[step*(i-half)                  ]
+            w1 = waypoints[step*(i-half)+5*np.sign(i-half)]
 
             dx, dy = w1 - w0
             theta = np.arctan2(dy, dx) - np.pi / 2
@@ -179,7 +181,7 @@ class OffRoadMap(object):
         return c
 
     def in_tree(self, state):
-        return self.get_class(*state[:2]) == 7
+        return self.get_class(*state[:2]) >= 5
 
     def _init_boundary(self):
 

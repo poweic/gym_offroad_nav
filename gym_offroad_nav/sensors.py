@@ -1,7 +1,9 @@
 import cv2
 import abc
+import math
 import numpy as np
 import time
+from numba import jit
 from gym_offroad_nav.utils import to_image
 from gym import spaces
 
@@ -59,10 +61,23 @@ def rotated_rect(img, (cx, cy), (width, height), angle, scale=1):
 
     warped = cv2.warpAffine(
         img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_LINEAR,
-        # borderMode=cv2.BORDER_REPLICATE
+        borderMode=cv2.BORDER_REPLICATE
     )
 
     return warped
+
+# @jit
+def compute_obj_ixiy(obj_positions, state, fov, cell_size):
+    theta = state[2]
+    cos, sin = math.cos(theta), math.sin(theta)
+    M = np.array([[cos, sin], [-sin, cos]])
+
+    dxy = obj_positions - state[:2][..., None]
+    dxy = M.dot(dxy)
+    ixs, iys = (dxy / cell_size).astype(np.int)
+    ixs, iys = ixs + fov/2, fov - 1 - iys
+
+    return ixs, iys
 
 # This sensor model return the front view of the vehicle as an image of shape
 # fov x fov, where fov is the field of view (how far you see).
@@ -74,11 +89,12 @@ class FrontViewer(SensorModel):
         self.field_of_view = field_of_view
         self.noise_level = noise_level
 
-        self.rewards = self.map.rewards[..., None].astype(np.float32)
-        self.rgb_map = self.map.rgb_map.astype(np.float32) / 255
-
-        R = self.rewards
-        C = self.rgb_map
+        # centralize the reward map, and rgb_map
+        rewards = self.map.rewards[..., None].astype(np.float32)
+        # self.reward_mean, self.reward_std = np.mean(rewards), np.std(rewards)
+        # self.rewards = (rewards - self.reward_mean) / self.reward_std
+        self.rewards = rewards
+        self.rgb_map = self.map.rgb_map.astype(np.float32) / 127.5 - 1
 
         self.images = None
 
@@ -97,13 +113,34 @@ class FrontViewer(SensorModel):
         n_channels = self.num_features()
         images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
 
-        W = self.get_waypoint_map(n_agents)
+        # W = self.get_waypoint_map(n_agents)
 
-        for i, (cx, cy, angle) in enumerate(zip(cxs, cys, angles)):
-            features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
-            images[i] = rotated_rect(features, (cx, cy), (fov, fov), angle)
+        obj_positions = np.concatenate([obj.position for obj in self.map.dynamic_objects], axis=-1)
+        radius = int(obj.radius / self.map.cell_size)
+        circle_opts = dict(color=(1, 1, 1), thickness=-1, radius=radius)
+
+        for i, (cx, cy, angle, s) in enumerate(zip(cxs, cys, angles, state.T)):
+            # features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
+            # features = np.concatenate([self.rewards, W[i]], axis=-1)
+            images[i] = rotated_rect(self.rewards, (cx, cy), (fov, fov), angle)[..., None]
+
+            # iterate all dynamic_objects and draw on rotated_and_cropped image
+            valids = [
+                ((isinstance(obj.valid, bool) and obj.valid) or obj.valid[i])
+                for obj in self.map.dynamic_objects
+            ]
+            ixs, iys = compute_obj_ixiy(obj_positions, s, fov, self.map.cell_size)
+
+            for ix, iy, valid in zip(ixs, iys, valids):
+                if valid:
+                    cv2.circle(images[i], (ix, iy), **circle_opts)
 
         self.images = images
+
+        # print " ===================== "
+        # print np.max(images[..., 0:1]), np.min(images[..., 0:1])
+        # print np.max(images[..., 1:4]), np.min(images[..., 1:4])
+        # print np.max(images[..., 4:5]), np.min(images[..., 4:5])
 
         return images
 
@@ -122,7 +159,7 @@ class FrontViewer(SensorModel):
         return images
 
     def num_features(self):
-        return 5
+        return 1
 
     def get_output_shape(self):
         m = int(self.field_of_view)
@@ -139,24 +176,28 @@ class FrontViewer(SensorModel):
 
         n_agents, h, w = self.images.shape[:3]
 
-        min_reward = min(self.map.class_id_to_rewards)
-        max_reward = max(self.map.class_id_to_rewards)
+        reward_min = -1 # np.min(self.map.class_id_to_rewards)
+        reward_max = +1 # max(1, np.max(self.map.class_id_to_rewards))
+
+        def unnormalize(x):
+            # x = x * self.reward_std + self.reward_mean
+            x = (x - reward_min) / (reward_max - reward_min)
+            return x
 
         # visualization (for debugging purpose)
-        disp_img = np.zeros((3*h, n_agents*w, 3), dtype=np.float32)
+        disp_img = np.zeros((1*h, n_agents*w, 3), dtype=np.float32)
         for i, img in enumerate(self.images):
             s = slice(i*w, (i+1)*w)
-            # disp_img[0*h:1*h, s] += (img[..., 0:1] * 255).astype(np.uint8)
-            disp_img[0*h:1*h, s] += (img[..., 0:1] - min_reward) / (max_reward - min_reward)
-            disp_img[1*h:2*h, s]  = img[..., [3, 2, 1]]
-            disp_img[2*h:3*h, s] += img[..., 4:5]
+            disp_img[0*h:1*h, s] += unnormalize(img[..., 0:1])
+            # disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]] + 1) / 2
+            # disp_img[2*h:3*h, s] += img[..., -1:]
 
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
 
     def get_waypoint_map(self, n_agents):
 
-        m = np.zeros((n_agents,) + self.rewards.shape, dtype=np.float32)
+        m = -np.ones((n_agents,) + self.rewards.shape, dtype=np.float32)
         bounds = self.map.bounds
         fov = self.field_of_view
 
@@ -169,7 +210,7 @@ class FrontViewer(SensorModel):
                 if (isinstance(obj.valid, bool) and obj.valid) or obj.valid[i]:
                     color = (1, 1, 1)
                 else:
-                    color = (0, 0, 0)
+                    color = (-1, -1, -1)
 
                 cv2.circle(m[i], (x, y), color=color, thickness=-1,
                            radius=int(obj.radius / self.map.cell_size))

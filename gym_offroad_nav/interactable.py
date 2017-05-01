@@ -87,6 +87,7 @@ class Vehicle(rendering.Geom):
         self.transform = rendering.Transform2D(pose=pose)
 
         # vertices of vehicles
+        # TODO use cell size to determine how large we draw on canvas
         h, w = size, size / 2
         r, l, t, b = w/2, -w/2, h/2, -h/2
         vertices = [(l,b), (l,t), (r,t), (r,b), (0, 0), (l, b), (r, b)]
@@ -144,6 +145,10 @@ class OffRoadScene(Interactable):
     def __init__(self, *args, **kwargs):
         super(OffRoadScene, self).__init__(**kwargs)
 
+        self.impact_penalty    = self.map.impact_penalty
+        self.reverse_penalty   = self.map.reverse_penalty
+        self.low_speed_penalty = eval(self.map.low_speed_penalty_function)
+
         sigma = 3
         # blur the reward map to get a more continuous (smoother) reward
         self.rewards = cv2.GaussianBlur(self.map.rewards, (sigma, sigma), 0)
@@ -153,14 +158,14 @@ class OffRoadScene(Interactable):
         r = self._bilinear_reward_lookup(x, y)
 
         classes = self.map.get_class(x, y)
-        impact = (classes == 7)
+        impact = (classes >= 5)
 
         vel = get_speed(state)
-        impact_penalty = -10. * impact * vel
-        reverse_penalty = np.minimum(state[4], 0)
-        low_speed_penalty = -1e-1 / (vel + 1e-1)
+        impact_penalty = self.impact_penalty * impact * vel
+        reverse_penalty = self.reverse_penalty * np.abs(np.minimum(state[4], 0))
+        low_speed_penalty = self.low_speed_penalty(state[4])
 
-        reward = r + impact_penalty + low_speed_penalty + reverse_penalty
+        reward = r - impact_penalty - low_speed_penalty - reverse_penalty
 
         return reward
 

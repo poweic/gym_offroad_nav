@@ -72,7 +72,7 @@ class GlobalPlanner(object):
     def seed(self, rng):
         self.rng = rng
 
-    def sample_path(self, graph, max_trial=30, debug=False):
+    def sample_path(self, graph, max_trial=40, debug=False):
         path = None
 
         # if BFS cannot find path between begin and end, a None value is

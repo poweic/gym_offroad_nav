@@ -20,7 +20,7 @@ os.environ["CC"]  = "g++"
 os.environ["CXX"] = "g++"
 
 ext = Extension(
-    "gym_offroad_nav.rotated_rect.rotated_rect", ["gym_offroad_nav/rotated_rect/rotated_rect.pyx"],
+    "gym_offroad_nav.vehicle_model.cython_impl", ["gym_offroad_nav/vehicle_model/cython_impl.pyx"],
     include_dirs = [numpy.get_include()], #, '/usr/local/include/opencv', '/usr/local/include'],
     # libraries = ['opencv_core', 'opencv_highgui', 'opencv_imgproc'],
     extra_compile_args=['-Wno-cpp', '-std=c++11', '-O3'],

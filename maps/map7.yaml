@@ -8,7 +8,7 @@ class_id_to_class_name:
   5: 'obstacles (non traversable)'
   6: 'bushes (non traversable)'
   7: 'tree (non traversable)}'
-class_id_to_rewards: [0.0, -0.001, -0.6, -0.3, -1.0, -5.0, -5.0, -5.0]
+class_id_to_rewards: [0.0, +0.001, -0.7, -0.3, -1.0, -1.0, -1.0, -1.0]
 class_id_to_rgb:
   0: [255, 255, 255]
   1: [178, 176, 153]
@@ -24,5 +24,5 @@ trail_skeleton_filename: "map7-skel.png"
 crash_penalty: 500.
 waypoint:
   radius: 2.0
-  reward: 10.0
+  reward: 20.0
   goal_reward: 500

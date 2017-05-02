@@ -100,7 +100,7 @@ class OffRoadMap(object):
 
         waypoints = np.array([x, y]).T
 
-        half = int(self.n_agents_per_worker / 2)
+        half = max(int(self.n_agents_per_worker / 2), 1)
         step = int(len(waypoints) * 0.70 / half)
 
         initial_pose = np.zeros((6, self.n_agents_per_worker))

@@ -10,6 +10,7 @@ try:
 except:
     # but it's optional, just ignore this
     pass
+from gym_offroad_nav.joystick import JoystickController
 
 env = gym.make("OffRoadNav-v0")
 # All the default_options are defined in gym_offroad_nav/envs/offroad_nav_env.py
@@ -26,6 +27,38 @@ for key, obs in state.iteritems():
 
 np.set_printoptions(linewidth=1000,
     formatter={'float_kind': lambda x: "{:+7.2f}".format(x).replace('+', ' ')})
+
+total_return = 0
+
+'''
+def callback(controls):
+    global total_return
+
+    if controls.buttons[0]:
+        env.reset()
+        total_return = 0
+
+    action_vf    = -(controls.pitch - 512.) / 512. * 6
+    # action_vf    = (controls.throttle- 128.) / 128. * 6
+
+    # action_steer =  (controls.yaw - 128.) / 128. * (30 / 180. * np.pi)
+    action_steer =  (controls.roll - 512.) / 512. * (30 / 180. * np.pi)
+    # print action_vf, action_steer
+    action = np.array([action_vf, action_steer])
+
+    # step in the environment
+    state, reward, done, _ = env.step(action.squeeze())
+
+    # collect the reward
+    total_return += reward
+    print "total_return = {}".format(total_return)
+
+    # refresh OpenGL renderer
+    env.render()
+
+joystick = JoystickController(callback)
+joystick.start()
+'''
 
 for i in range(1000):
     env.reset()

@@ -135,6 +135,7 @@ class FrontViewer(SensorModel):
 
             for ix, iy, valid in zip(ixs, iys, valids):
                 if valid:
+                    # self.images[i, iy, ix] = 1
                     cv2.circle(self.images[i], (ix, iy), **circle_opts)
 
         c_lidar_mask(self.images)
@@ -189,6 +190,7 @@ class FrontViewer(SensorModel):
             # disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]] + 1) / 2
             # disp_img[2*h:3*h, s] += img[..., -1:]
 
+        # disp_img = cv2.resize(disp_img, (disp_img.shape[1]*4, disp_img.shape[0]*4), interpolation=cv2.INTER_NEAREST)
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
 

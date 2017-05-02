@@ -13,9 +13,9 @@ from gym_offroad_nav.utils import get_options_from_TF_flags, Timer, get_speed
 from gym_offroad_nav.offroad_map import OffRoadMap, Rewarder
 from gym_offroad_nav.sensors import Odometry, FrontViewer
 from gym_offroad_nav.vehicle_model.numpy_impl import VehicleModel
-from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
 from gym_offroad_nav.viewer import Viewer
-from gym_offroad_nav.trajectory_following import TrajectoryFitter
+# from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
+# from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
 DEG2RAD = np.pi / 180.
 

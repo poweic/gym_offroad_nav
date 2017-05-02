@@ -104,16 +104,21 @@ void bresenham_trace(
 
 void mask_single_image(float* image, uint32_t height, uint32_t width) {
 
-  int32_t x1 = height - 1, y1 = width/2 - 1;
+  for (uint32_t j=0; j<height; ++j) {
+    // Left boundary
+    bresenham_trace(height - 1, width/2 - 1, j, 0, image, width, height);
 
-  uint32_t step = 1;
-  for (uint32_t j=0; j<height; j+=step) {
-    bresenham_trace(x1, y1, j, 0, image, width, height);
-    bresenham_trace(x1, y1, j, width-1, image, width, height);
+    // Right boundary
+    bresenham_trace(height - 1, width/2    , j, width-1, image, width, height);
   }
 
-  for (uint32_t i=0; i<width; i+=step)
-    bresenham_trace(x1, y1, 0, i, image, width, height);
+  // Left part of Top boundary
+  for (uint32_t i=0; i<width/2; ++i)
+    bresenham_trace(height - 2, width/2 - 1, 0, i, image, width, height);
+
+  // Right part of Top boundary
+  for (uint32_t i=width/2; i<width; ++i)
+    bresenham_trace(height - 2, width/2    , 0, i, image, width, height);
 }
 
 void mask(float* images, uint32_t batch_size, uint32_t height, uint32_t width) {

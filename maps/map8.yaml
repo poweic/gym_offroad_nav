@@ -9,7 +9,9 @@ class_id_to_class_name:
   6: 'bushes (non traversable)'
   7: 'tree (non traversable)}'
 traversable: [True, True, True, True, True, False, False, False]
-class_id_to_rewards: [0.0, 0.01, -0.07, -0.02, -0.05, -1.0, -0.95, -1.0]
+# for classes that are not traversable, rewards has no real meaning for the agent,
+# because the agent can never get those reward. I use that to store the porosity
+class_id_to_rewards: [0.0, 0.01, -0.07, -0.02, -0.05, -0.8, -0.4, -0.6]
 class_id_to_rgb:
   0: [255, 255, 255]
   1: [178, 176, 153]

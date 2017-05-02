@@ -99,6 +99,14 @@ class FrontViewer(SensorModel):
 
         self.images = None
 
+        # For classes that are not traversable, the rewards are actually the
+        # porosity. Ex: bushes has a porosity of 0.4, so we store -0.4. We use
+        # the minimum porosity * 0.95 as the threshold (take np.max because
+        # they are all negative).
+        self.pass_through_thres = np.max(
+            self.map.class_id_to_rewards[~self.map.traversable]
+        ) * 0.95
+
         self.timer = 0
         self.counter = 0
 
@@ -138,7 +146,8 @@ class FrontViewer(SensorModel):
                     # self.images[i, iy, ix] = 1
                     cv2.circle(self.images[i], (ix, iy), **circle_opts)
 
-        c_lidar_mask(self.images)
+        random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
+        c_lidar_mask(self.images, self.pass_through_thres, random_seed)
 
         return self.images
 

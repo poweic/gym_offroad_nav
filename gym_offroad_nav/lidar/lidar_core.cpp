@@ -1,5 +1,6 @@
 // cython methods to speed-up evaluation
 #include <stdint.h>
+#include <stdlib.h>
 #include <math.h>
 #define PI 3.14159265359
 #define RAD2DEG (180. / PI)
@@ -7,7 +8,7 @@
 
 #define GET_VALUE(i, j) (image[(i)*height+(j)])
 // threshold
-const float kThreshold = -0.9;
+float gThreshold;
 
 // Provide the compiler with branch prediction information, which may gain huge
 // speed-up when you're pretty sure a conditional statement is almost always
@@ -18,16 +19,20 @@ const float kThreshold = -0.9;
 #define unlikely(x)    __builtin_expect(!!(x), 0)
 
 // absolute value of x
-inline int abs_(int x) { return (x >= 0) ? x : -x; }
+template <typename T>
+inline T abs_(T x) { return (x >= 0) ? x : -x; }
 
 // sign of x, return either -1, 0, or 1
-inline int sign_(int x) { return (x > 0) ? 1 : ((x < 0) ? -1 : 0); }
+template <typename T>
+inline T sign_(T x) { return (x > 0) ? 1 : ((x < 0) ? -1 : 0); }
 
 // max of x and y
-inline int max_(int x, int y) { return (x > y) ? x : y; }
+template <typename T>
+inline T max_(T x, T y) { return (x > y) ? x : y; }
 
 // max of x and y
-inline int min_(int x, int y) { return (x < y) ? x : y; }
+template <typename T>
+inline T min_(T x, T y) { return (x < y) ? x : y; }
 
 // Use C macro ##, which is a token-pasting operator
 #define trace_one_step(x, a) { \
@@ -69,9 +74,15 @@ inline void __attribute__((always_inline)) trace_along_axis(
 
       float& value = image[idx];
 
-      if (image[idx] < kThreshold)
-	collided = true;
-      
+      // Only obstacles, bushes, and trees has value < 0
+      if (value < gThreshold) {
+	// stop_prob is the absolute value, but since gThreshold < 0, value
+	// is always smaller than 0
+	float stop_prob = -value;
+	if (float(rand()) / RAND_MAX < stop_prob)
+	  collided = true;
+      }
+
       if (collided)
 	value = -1;
 
@@ -121,62 +132,18 @@ void mask_single_image(float* image, uint32_t height, uint32_t width) {
     bresenham_trace(height - 2, width/2    , 0, i, image, width, height);
 }
 
-void mask(float* images, uint32_t batch_size, uint32_t height, uint32_t width) {
+void mask(float* images, uint32_t batch_size, uint32_t height, uint32_t width,
+    float threshold, uint32_t random_seed) {
+
+  // If seed is set to 1, the generator is reinitialized to its initial value
+  // and produces the same values as before any call to rand or srand.
+  // Make sure it's not 1, and set the random_seed
+  assert(random_seed > 1);
+  srand(random_seed);
+  gThreshold = threshold;
+
   for (uint32_t k=0; k<batch_size; ++k) {
     float* image = images + k*width*height;
     mask_single_image(image, height, width);
   }
 }
-
-/*
-#define T_VISITED 100
-#define NT_VISITED -100
-#define BOUNDARY -50
-
-// run bfs recursively and return whether (i, j) is traversable
-bool bfs_inner(float* image, uint32_t height, uint32_t width, uint32_t i, uint32_t j) {
-
-  float& value = GET_VALUE(i, j);
-
-  // For those visited, store +100 for traversable, -100 for non-traversable
-  // Test if visited, if yes, continue
-  if (value == T_VISITED or value == NT_VISITED)
-    return value == T_VISITED;
-
-  if (value == -50)
-    return false;
-
-  // if not visited, and it's traversable, then store +100
-  if (value > kThreshold) {
-    value = +T_VISITED;
-    return true;
-  }
-
-  // if not visted and non-traversable, run bfs_inner recursively
-  value = NT_VISITED;
-  bool l = (i == 0)        ? false : bfs_inner(image, height, width, i-1, j);
-  bool r = (i == width-1)  ? false : bfs_inner(image, height, width, i+1, j);
-  bool t = (j == 0)        ? false : bfs_inner(image, height, width, i, j-1);
-  bool b = (j == height-1) ? false : bfs_inner(image, height, width, i, j+1);
-
-  if (l or r or t or b)
-    value = BOUNDARY;
-
-  return false;
-}
-
-void bfs(float* image, uint32_t height, uint32_t width) {
-  for (uint32_t i=0; i<width; ++i) {
-    for (uint32_t j=0; j<height; ++j) {
-      bfs_inner(image, height, width, i, j);
-    }
-  }
-
-  for (uint32_t i=0; i<width; ++i) {
-    for (uint32_t j=0; j<height; ++j) {
-      float& value = image[i*height+j];
-      value = (value == BOUNDARY);
-    }
-  }
-}
-*/

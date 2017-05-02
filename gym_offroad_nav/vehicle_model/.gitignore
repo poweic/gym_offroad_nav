@@ -1,2 +1,2 @@
-*.cpp
+cython_impl.cpp
 *.so

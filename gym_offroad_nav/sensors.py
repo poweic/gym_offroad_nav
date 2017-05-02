@@ -5,6 +5,7 @@ import numpy as np
 import time
 from numba import jit
 from gym_offroad_nav.utils import to_image
+from gym_offroad_nav.lidar.lidar import c_lidar_mask
 from gym import spaces
 
 RAD2DEG = 180. / np.pi
@@ -111,7 +112,8 @@ class FrontViewer(SensorModel):
         fov = self.field_of_view
 
         n_channels = self.num_features()
-        images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32)
+        if self.images is None:
+            self.images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32, order='C')
 
         # W = self.get_waypoint_map(n_agents)
 
@@ -122,7 +124,7 @@ class FrontViewer(SensorModel):
         for i, (cx, cy, angle, s) in enumerate(zip(cxs, cys, angles, state.T)):
             # features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
             # features = np.concatenate([self.rewards, W[i]], axis=-1)
-            images[i] = rotated_rect(self.rewards, (cx, cy), (fov, fov), angle)[..., None]
+            self.images[i] = rotated_rect(self.rewards, (cx, cy), (fov, fov), angle)[..., None]
 
             # iterate all dynamic_objects and draw on rotated_and_cropped image
             valids = [
@@ -133,16 +135,11 @@ class FrontViewer(SensorModel):
 
             for ix, iy, valid in zip(ixs, iys, valids):
                 if valid:
-                    cv2.circle(images[i], (ix, iy), **circle_opts)
+                    cv2.circle(self.images[i], (ix, iy), **circle_opts)
 
-        self.images = images
+        c_lidar_mask(self.images)
 
-        # print " ===================== "
-        # print np.max(images[..., 0:1]), np.min(images[..., 0:1])
-        # print np.max(images[..., 1:4]), np.min(images[..., 1:4])
-        # print np.max(images[..., 4:5]), np.min(images[..., 4:5])
-
-        return images
+        return self.images
 
     def resize(self, images):
         n_agents, fov, fov, n_channels = images.shape

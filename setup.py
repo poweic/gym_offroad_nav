@@ -19,7 +19,7 @@ import numpy
 os.environ["CC"]  = "g++"
 os.environ["CXX"] = "g++"
 
-ext = Extension(
+ext1 = Extension(
     "gym_offroad_nav.vehicle_model.cython_impl", ["gym_offroad_nav/vehicle_model/cython_impl.pyx"],
     include_dirs = [numpy.get_include()], #, '/usr/local/include/opencv', '/usr/local/include'],
     # libraries = ['opencv_core', 'opencv_highgui', 'opencv_imgproc'],
@@ -27,4 +27,13 @@ ext = Extension(
     language="c++"
 )
 
-setup(ext_modules = cythonize(ext))
+ext2 = Extension(
+    "gym_offroad_nav.lidar.lidar", ["gym_offroad_nav/lidar/lidar.pyx"],
+    include_dirs = [numpy.get_include()], #, '/usr/local/include/opencv', '/usr/local/include'],
+    # libraries = ['opencv_core', 'opencv_highgui', 'opencv_imgproc'],
+    extra_compile_args=['-Wno-cpp', '-std=c++11', '-O3'],
+    language="c++"
+)
+
+setup(ext_modules = cythonize(ext1))
+setup(ext_modules = cythonize(ext2))

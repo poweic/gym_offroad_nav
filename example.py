@@ -30,7 +30,6 @@ np.set_printoptions(linewidth=1000,
 
 total_return = 0
 
-'''
 def callback(controls):
     global total_return
 
@@ -51,14 +50,13 @@ def callback(controls):
 
     # collect the reward
     total_return += reward
-    print "total_return = {}".format(total_return)
+    print "total_return = {} [done = {}]".format(total_return, done)
 
     # refresh OpenGL renderer
     env.render()
 
 joystick = JoystickController(callback)
 joystick.start()
-'''
 
 for i in range(1000):
     env.reset()

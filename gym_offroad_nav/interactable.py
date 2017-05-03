@@ -149,13 +149,11 @@ class OffRoadScene(Interactable):
         self.reverse_penalty   = self.map.reverse_penalty
         self.low_speed_penalty = eval(self.map.low_speed_penalty_function)
 
-        sigma = 3
-        # blur the reward map to get a more continuous (smoother) reward
-        self.rewards = cv2.GaussianBlur(self.map.rewards, (sigma, sigma), 0)
+        self.rewards = self.map.blurred_rewards.copy()
 
     def react(self, state):
+
         x, y = state[:2]
-        r = self._bilinear_reward_lookup(x, y)
 
         classes = self.map.get_class(x, y)
         impact = (classes >= 5)
@@ -163,9 +161,9 @@ class OffRoadScene(Interactable):
         vel = get_speed(state)
         impact_penalty = self.impact_penalty * impact * vel
         reverse_penalty = self.reverse_penalty * np.abs(np.minimum(state[4], 0))
-        low_speed_penalty = self.low_speed_penalty(state[4])
+        low_speed_penalty = 0
 
-        reward = r - impact_penalty - low_speed_penalty - reverse_penalty
+        reward = - impact_penalty - low_speed_penalty - reverse_penalty
 
         return reward
 

@@ -17,6 +17,9 @@ def dirname(fn):
 def get_speed(state):
     return np.sqrt(state[3] ** 2 + state[4] ** 2)
 
+def get_position(state):
+    return np.sqrt(state[0] ** 2 + state[1] ** 2)
+
 def normalize(x):
     value_range = np.max(x) - np.min(x)
     if value_range != 0:

@@ -17,6 +17,8 @@ from gym_offroad_nav.viewer import Viewer
 # from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
 # from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
+from collections import deque
+
 DEG2RAD = np.pi / 180.
 
 class OffRoadNavEnv(gym.Env):
@@ -33,12 +35,13 @@ class OffRoadNavEnv(gym.Env):
         'timestep': 0.025,
         'odom_noise_level': 0.02,
         'vehicle_model_noise_level': 0.02,
-        'initial_pose_noise': [0, 0, 5 * DEG2RAD, 0.5, 0, 5 * DEG2RAD],
+        'initial_pose_noise': [0, 0, 5 * DEG2RAD, 0, 0, 5 * DEG2RAD],
+        'avg_state_window': 30,
         'wheelbase': 2.0,
-        'map_def': 'map8',
+        'map_def': 'map9',
         'command_freq': 5,
-        'n_agents_per_worker': 32,
-        'viewport_scale': 2,
+        'n_agents_per_worker': 1,
+        'viewport_scale': 3,
         'discount_factor': 0.99,
         'max_steps': 100,
         'drift': False
@@ -181,14 +184,12 @@ class OffRoadNavEnv(gym.Env):
         new_state = self.state.copy()
         # new_state_gpu = self.state.copy()
 
-        new_state = self.vehicle_model.predict(new_state, action, self.n_sub_steps)
-        """
-        for j in range(self.n_sub_steps):
-            new_state = self.vehicle_model.predict(new_state, action)
-
-        """
+        new_state, rewards = self.vehicle_model.predict(
+            new_state, action, self.n_sub_steps, self.map.blurred_rewards,
+            self.map.bounds, self.map.cell_size
+        )
+        # print "rewards (from VM) = {}".format(rewards.squeeze())
         self.timer.vehicle_model.toc()
-
 
         """
         new_state_gpu = self.vehicle_model_gpu.predict(new_state_gpu, action, self.n_sub_steps, self.sess)
@@ -208,7 +209,7 @@ class OffRoadNavEnv(gym.Env):
         info = AttrDict()
 
         # compute reward based on new_state
-        info.reward = self.rewarder.eval(new_state) - crashed * self.map.crash_penalty
+        info.reward = rewards + self.rewarder.eval(new_state) - crashed * self.map.crash_penalty
         self.total_reward += info.reward
         reward = np.mean(info.reward)
 

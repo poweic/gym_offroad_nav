@@ -48,6 +48,11 @@ class OffRoadMap(object):
         # self.rewards = load_rewards("big_track")
         print self.rewards.shape
 
+        sigma = 3
+        # blur the reward map to get a more continuous (smoother) reward
+        self.blurred_rewards = np.ascontiguousarray(
+            cv2.GaussianBlur(self.rewards, (sigma, sigma), 0))
+
         # Random random generator for global planner to randomly sample paths
         self.rng = np.random.RandomState()
         self.global_planner = GlobalPlanner()

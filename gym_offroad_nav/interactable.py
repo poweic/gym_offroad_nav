@@ -140,16 +140,13 @@ class Vehicle(rendering.Geom):
         for p in self.trace:
             p.render()
 
+'''
 class OffRoadScene(Interactable):
 
     def __init__(self, *args, **kwargs):
         super(OffRoadScene, self).__init__(**kwargs)
 
-        self.impact_penalty    = self.map.impact_penalty
-        self.reverse_penalty   = self.map.reverse_penalty
-        self.low_speed_penalty = eval(self.map.low_speed_penalty_function)
-
-        self.rewards = self.map.blurred_rewards.copy()
+        self.impact_penalty = self.map.impact_penalty
 
     def react(self, state):
 
@@ -160,46 +157,6 @@ class OffRoadScene(Interactable):
 
         vel = get_speed(state)
         impact_penalty = self.impact_penalty * impact * vel
-        reverse_penalty = self.reverse_penalty * np.abs(np.minimum(state[4], 0))
-        low_speed_penalty = 0
 
-        reward = - impact_penalty - low_speed_penalty - reverse_penalty
-
-        return reward
-
-    def _bilinear_reward_lookup(self, x, y):
-        ix, iy = self.map.get_ixiy(x, y)
-
-        # alias for self.map.bounds
-        bounds = self.map.bounds
-
-        x0 = clip(ix    , bounds.x_min, bounds.x_max - 1)
-        y0 = clip(iy    , bounds.y_min, bounds.y_max - 1)
-        x1 = clip(ix + 1, bounds.x_min, bounds.x_max - 1)
-        y1 = clip(iy + 1, bounds.y_min, bounds.y_max - 1)
-
-        f00 = self._get_reward(x0, y0)
-        f01 = self._get_reward(x0, y1)
-        f10 = self._get_reward(x1, y0)
-        f11 = self._get_reward(x1, y1)
-
-        xx = (x / self.map.cell_size - ix).astype(np.float32)
-        yy = (y / self.map.cell_size - iy).astype(np.float32)
-
-        w00 = (1.-xx) * (1.-yy)
-        w01 = (   yy) * (1.-xx)
-        w10 = (   xx) * (1.-yy)
-        w11 = (   xx) * (   yy)
-
-        r = f00*w00 + f01*w01 + f10*w10 + f11*w11
-        return r.reshape(1, -1)
-
-    def _get_reward(self, ix, iy):
-        bounds = self.map.bounds
-        r = self.rewards[bounds.y_max - 1 - iy, ix - bounds.x_min]
-
-        # this is legacy code, make sure I didn't break it
-        linear_idx = (bounds.y_max - 1 - iy) * self.map.width + (ix - bounds.x_min)
-        assert np.all(r == self.rewards.flatten()[linear_idx])
-
-        return r
+        return - impact_penalty
+'''

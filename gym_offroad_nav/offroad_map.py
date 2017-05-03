@@ -3,7 +3,7 @@ import yaml
 import PIL.Image
 import numpy as np
 from gym_offroad_nav.utils import AttrDict, dirname
-from gym_offroad_nav.interactable import OffRoadScene, Coin
+from gym_offroad_nav.interactable import Coin
 from gym_offroad_nav.global_planner import GlobalPlanner
 
 def get_palette_color(img):
@@ -50,7 +50,7 @@ class OffRoadMap(object):
 
         sigma = 3
         # blur the reward map to get a more continuous (smoother) reward
-        self.blurred_rewards = np.ascontiguousarray(
+        self.reward_map = np.ascontiguousarray(
             cv2.GaussianBlur(self.rewards, (sigma, sigma), 0))
 
         # Random random generator for global planner to randomly sample paths
@@ -60,7 +60,7 @@ class OffRoadMap(object):
         # TODO
         # Maybe we can use the idea of "context" to create static/dynamic object
         # instead of passing map to every constructor.
-        self.scene = OffRoadScene(map=self)
+        # self.scene = OffRoadScene(map=self)
         self.static_objects = []
 
         self.reset()
@@ -90,7 +90,8 @@ class OffRoadMap(object):
         ]
 
     def get_interactables(self):
-        return [self.scene] + self.static_objects + self.dynamic_objects
+        # return [self.scene] + self.static_objects + self.dynamic_objects
+        return self.static_objects + self.dynamic_objects
 
     def create_waypoints(self):
         b = self.bounds
@@ -179,14 +180,12 @@ class OffRoadMap(object):
 
         return rewards
 
-    def get_class(self, x, y):
+    def get_class(self, state):
+        x, y = state[:2]
         b = self.bounds
         ix, iy = self.get_ixiy(x, y)
         c = self.map_structure[b.y_max - 1 - iy, ix - b.x_min]
         return c
-
-    def in_tree(self, state):
-        return self.get_class(*state[:2]) >= 5
 
     def _init_boundary(self):
 

@@ -185,10 +185,8 @@ class OffRoadNavEnv(gym.Env):
         # new_state_gpu = self.state.copy()
 
         new_state, rewards = self.vehicle_model.predict(
-            new_state, action, self.n_sub_steps, self.map.blurred_rewards,
-            self.map.bounds, self.map.cell_size
+            new_state, action, self.n_sub_steps, self.map
         )
-        # print "rewards (from VM) = {}".format(rewards.squeeze())
         self.timer.vehicle_model.toc()
 
         """
@@ -203,20 +201,24 @@ class OffRoadNavEnv(gym.Env):
 
         self.timer.others.tic()
         # See if the car is in tree. If the speed is too high, then it's crashed
-        in_tree = self.map.in_tree(new_state)
-        crashed = in_tree & (get_speed(new_state) > 1.)
+        cls = self.map.get_class(new_state)
+        impact = ~self.map.traversable[cls]
+        vel = get_speed(new_state)
+        crashed = impact & (vel > 1.)
+        crash_penalty = crashed * self.map.crash_penalty
+        impact_penalty = vel * impact * self.map.impact_penalty
 
         info = AttrDict()
 
         # compute reward based on new_state
-        info.reward = rewards + self.rewarder.eval(new_state) - crashed * self.map.crash_penalty
+        info.reward = rewards + self.rewarder.eval(new_state) - crash_penalty - impact_penalty
         self.total_reward += info.reward
         reward = np.mean(info.reward)
 
         # if new position is in the tree, then use old one & set velocity = 0
-        new_state[0:3, in_tree] = self.state[0:3, in_tree]
-        new_state[3:6, in_tree] = 0
-        self.vehicle_model.reset(new_state, in_tree)
+        new_state[0:3, impact] = self.state[0:3, impact]
+        new_state[3:6, impact] = 0
+        self.vehicle_model.reset(new_state, impact)
 
         self.state[:] = new_state[:]
 

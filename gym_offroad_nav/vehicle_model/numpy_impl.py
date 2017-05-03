@@ -57,7 +57,7 @@ class VehicleModel():
         yawrate = vf * np.tan(steer) / self.wheelbase
         return yawrate
 
-    def predict(self, state, action, n_sub_steps, reward_map, bounds, cell_size):
+    def predict(self, state, action, n_sub_steps, map):
 
         action = action.astype(np.float64, order='C')
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
@@ -68,11 +68,13 @@ class VehicleModel():
             self.x, state, action, n_sub_steps,
             self.timestep, self.noise_level, self.wheelbase, float(self.drift),
             random_seed,
-            reward_map, dict(bounds), cell_size,
-            low_speed_penalty=0.01, decay_rate=3, high_acc_penalty=0.01
+            map.reward_map, dict(map.bounds), map.cell_size,
+            low_speed_penalty=map.low_speed_penalty,
+            decay_rate=map.low_speed_penalty_decay_rate,
+            high_acc_penalty=map.high_acc_penalty
         )
 
-        return state, rewards
+        return state, rewards.reshape(-1)
 
     def predict_old(self, state, action):
         if self.x is None:

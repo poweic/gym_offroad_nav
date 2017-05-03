@@ -59,20 +59,17 @@ class VehicleModel():
 
     def predict(self, state, action, n_sub_steps, reward_map, bounds, cell_size):
 
-        batch_size = state.shape[1]
-        noise = self.rng.randn(n_sub_steps, 3, batch_size)
         action = action.astype(np.float64, order='C')
-
-        rewards = np.zeros((1, batch_size), dtype=np.float32, order='C')
-        # rewards = np.zeros((reward_map.shape[0], reward_map.shape[1]), dtype=np.float32, order='C')
+        random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
 
         # c_step implicitly ASSUME x, state, action, noise are contiguous array
         # with row-major memory layout (i.e. order='C')
-        c_step(
-            self.x, state, action, noise, n_sub_steps, batch_size,
+        rewards = c_step(
+            self.x, state, action, n_sub_steps,
             self.timestep, self.noise_level, self.wheelbase, float(self.drift),
-            rewards, reward_map,
-            bounds.x_min, bounds.x_max, bounds.y_min, bounds.y_max, cell_size
+            random_seed,
+            reward_map, dict(bounds), cell_size,
+            low_speed_penalty=0.01, decay_rate=3, high_acc_penalty=0.01
         )
 
         return state, rewards

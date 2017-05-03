@@ -1,9 +1,13 @@
 // cython methods to speed-up evaluation
 #include <stdint.h>
 #include <math.h>
+#include <random>
 #define PI 3.14159265359
 #define RAD2DEG (180. / PI)
 #define M2CM 100.
+#define randn() (distribution(generator))
+
+std::default_random_engine generator;
 
 /*
    |              ( A )                              ( B )
@@ -59,11 +63,23 @@ inline float bilinear_reward_lookup(const double &x, const double &y,
 }
 
 void step(
-    double* x, double* s, const double* u, const double* n,
+    double* x, double* s, const double* u,
     uint32_t n_sub_steps, uint32_t batch_size,
     float dt, float noise_level, float wheelbase, float drift,
+    uint32_t random_seed,
     float* rewards, const float* const reward_map, uint32_t height, uint32_t width,
-    int32_t x_min, int32_t x_max, int32_t y_min, int32_t y_max, float cell_size) {
+    int32_t x_min, int32_t x_max, int32_t y_min, int32_t y_max, float cell_size,
+    float low_speed_penalty, float decay_rate, float high_acc_penalty) {
+
+  // penalty and decay rate might be ambiguous: is it positive or negative?
+  // make sure they're always positive
+  assert(low_speed_penalty > 0);
+  assert(decay_rate > 0);
+  assert(high_acc_penalty > 0);
+
+  assert(random_seed > 1);
+  generator.seed(random_seed);
+  std::normal_distribution<double> distribution(1., noise_level);
 
   // syntax sugar
   uint32_t& b = batch_size;
@@ -87,10 +103,6 @@ void step(
       const double& u0 = u[j + 0*b];  // forward velocity command
       const double& u1 = u[j + 1*b];  // steering angle command
       double u_yawrate = STEER_TO_YAWRATE(s4, u1, wheelbase);
-
-      const double& n0 = n[(i*3 + 0)*b + j];
-      const double& n1 = n[(i*3 + 1)*b + j];
-      const double& n2 = n[(i*3 + 2)*b + j];
 
       // printf("x = [%f, %f, %f, %f]\n", x0, x1, x2, x3);
       // printf("s = [%f, %f, %f, %f, %f, %f]\n", s0, s1, s2, s3, s4, s5);
@@ -120,9 +132,9 @@ void step(
       double vy = (s * s3 + c * s4);
 
       // Formula: dx = v dt (add additional environmental noise)
-      double dx = vx * (1. + n0 * noise_level) * dt;
-      double dy = vy * (1. + n1 * noise_level) * dt;
-      double dw = s5 * (1. + n2 * noise_level) * dt;
+      double dx = vx * randn() * dt;
+      double dy = vy * randn() * dt;
+      double dw = s5 * randn() * dt;
 
       // compute the displacement (ds = sqrt(dx^2 + dy^2)) along the path, the
       // longer the distance travel on "smooth trail", the higher the reward.
@@ -133,7 +145,7 @@ void step(
       rewards[j] += displacement * r;
 
       float v = VEC_NORM(vx, vy);
-      rewards[j] -= 0.01 * exp(-3 * v);
+      rewards[j] -= low_speed_penalty * exp(-decay_rate * v);
 
       // Skip i == 0, penalize large acceleration
       // Formula: a = dv / dt
@@ -142,7 +154,7 @@ void step(
 	float dvy = vy - prev_vy;
 	float dv = VEC_NORM(dvx, dvy);
 	float acc = dv / dt;
-	rewards[j] -= 0.01 * acc;
+	rewards[j] -= high_acc_penalty * acc;
       }
 
       s0 += dx;

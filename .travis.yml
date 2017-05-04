@@ -3,7 +3,8 @@ python:
   - "2.7"
 # command to install dependencies
 install:
-  - pip install -r requirements.txt
+  - pip install --upgrade pip setuptools wheel
+  - pip install -r requirements.txt --only-binary=numpy,scipy
   - pip install opencv-python
 # specify branches to test
 branches:

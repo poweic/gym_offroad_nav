@@ -17,5 +17,7 @@ branches:
   only:
     - develop
     - master
+before_script:
+  - export DISPLAY=':0'
 # command to run tests
 script: pytest

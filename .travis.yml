@@ -1,9 +1,10 @@
 language: python
 python:
   - "2.7"
+before_install:
+  - sudo apt-get install g++
 # command to install dependencies
 install:
-  - apt-get install g++
   - pip install --upgrade pip setuptools wheel
   - pip install -r requirements.txt --only-binary=numpy,scipy
   - pip install opencv-python

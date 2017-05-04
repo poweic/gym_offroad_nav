@@ -2,7 +2,17 @@ import os
 import scipy.io
 import numpy as np
 from gym_offroad_nav.utils import dirname
-from gym_offroad_nav.vehicle_model.cython_impl import c_step
+from gym_offroad_nav.vehicle_model.cython_impl import c_step as cython_step
+from gym_offroad_nav.snapshot import memory_snapshot_decorate
+
+# @memory_snapshot_decorate("tests/test_vehicle_model/test_case_7.pkl")
+def step(x, s, u, n_sub_steps, timestep, noise_level, wheelbase, drift,
+         random_seed, reward_map, bounds, cell_size, low_speed_penalty,
+         decay_rate, high_acc_penalty):
+
+    return cython_step(x, s, u, n_sub_steps, timestep, noise_level, wheelbase, drift,
+         random_seed, reward_map, bounds, cell_size, low_speed_penalty,
+         decay_rate, high_acc_penalty)
 
 class VehicleModel():
 
@@ -64,7 +74,7 @@ class VehicleModel():
 
         # c_step implicitly ASSUME x, state, action, noise are contiguous array
         # with row-major memory layout (i.e. order='C')
-        rewards, distances_traveled = c_step(
+        rewards, distances_traveled = step(
             self.x, state, action, n_sub_steps,
             self.timestep, self.noise_level, self.wheelbase, float(self.drift),
             random_seed,

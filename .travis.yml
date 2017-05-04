@@ -6,6 +6,7 @@ install:
   - pip install --upgrade pip setuptools wheel
   - pip install -r requirements.txt --only-binary=numpy,scipy
   - pip install opencv-python
+  - python setup.py build_ext --inplace
 # specify branches to test
 branches:
   only:

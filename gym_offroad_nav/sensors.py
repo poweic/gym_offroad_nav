@@ -4,7 +4,7 @@ import math
 import numpy as np
 import time
 from numba import jit
-from gym_offroad_nav.utils import to_image
+from gym_offroad_nav.utils import to_image, Timer
 from gym_offroad_nav.lidar.lidar import c_lidar_mask
 from gym import spaces
 
@@ -116,7 +116,7 @@ class FrontViewer(SensorModel):
             self.map.class_id_to_rewards[~self.map.traversable]
         ) * 0.95
 
-        self.timer = 0
+        self.timer = Timer("raycasting")
         self.counter = 0
 
     def eval(self, state):
@@ -158,8 +158,10 @@ class FrontViewer(SensorModel):
             # Draw the vehicle itself as a dot
             # self.images[i, vpos[1], vpos[0]] = 1
 
+        self.timer.tic()
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
         c_lidar_mask(self.images, self.pass_through_thres, random_seed)
+        self.timer.toc()
 
         return self.images
 

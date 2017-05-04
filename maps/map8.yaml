@@ -30,6 +30,7 @@ impact_penalty: 10.
 reverse_penalty: 0.000
 # low_speed_penalty_function: "lambda x: 0.5 * np.exp(-1.0 * np.abs(x)) * (x < 3.) * (x > 0)" #  8, 14 minutes (see below)
 low_speed_penalty_function: "lambda x: 0.1 * np.exp(-3.0 * np.abs(x)) * (x < 3.) * (x > 0)" #  14+ minutes and counting (max rewards = 36+)
+# waypoints configurations
 waypoint:
   radius: 2.0
   reward: 10.0

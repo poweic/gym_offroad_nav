@@ -55,10 +55,11 @@ class Odometry(SensorModel):
     def get_obs_space(self):
         return spaces.Box(low=FLOAT_MIN, high=FLOAT_MAX, shape=(6, 1))
 
-def rotated_rect(img, (cx, cy), (width, height), angle, scale=1):
-    pivot = (width/2, height)
+def rotated_rect(img, pivot, center, size, angle, scale=1):
+    cx, cy = center
+    width, height = size
     M = cv2.getRotationMatrix2D(pivot, angle, scale)
-    M[:, 2] += (cx - width/2, cy - height)
+    M[:, 2] += (cx - pivot[0], cy - pivot[1])
 
     warped = cv2.warpAffine(
         img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_LINEAR,
@@ -68,7 +69,7 @@ def rotated_rect(img, (cx, cy), (width, height), angle, scale=1):
     return warped
 
 # @jit
-def compute_obj_ixiy(obj_positions, state, fov, cell_size):
+def compute_obj_ixiy(obj_positions, state, fov, pivot, cell_size):
     theta = state[2]
     cos, sin = math.cos(theta), math.sin(theta)
     M = np.array([[cos, sin], [-sin, cos]])
@@ -76,19 +77,27 @@ def compute_obj_ixiy(obj_positions, state, fov, cell_size):
     dxy = obj_positions - state[:2][..., None]
     dxy = M.dot(dxy)
     ixs, iys = (dxy / cell_size).astype(np.int)
-    ixs, iys = ixs + fov/2, fov - 1 - iys
+    ixs, iys = ixs + pivot[0], -iys + pivot[1]
 
     return ixs, iys
 
 # This sensor model return the front view of the vehicle as an image of shape
 # fov x fov, where fov is the field of view (how far you see).
 class FrontViewer(SensorModel):
-    def __init__(self, map, field_of_view, noise_level=0):
+    def __init__(self, map, field_of_view, vehicle_position, noise_level=0):
         super(FrontViewer, self).__init__(noise_level)
 
         self.map = map
         self.field_of_view = field_of_view
         self.noise_level = noise_level
+
+        fov = field_of_view
+        if vehicle_position is "center":
+            self.vehicle_position = (fov/2, fov - 1 - fov/2)
+        elif vehicle_position is "bottom":
+            self.vehicle_position = (fov/2, fov - 1 - 0)
+        else:
+            raise ValueError("vehicle position must be either center or bottom")
 
         # centralize the reward map, and rgb_map
         rewards = self.map.rewards[..., None].astype(np.float32)
@@ -128,23 +137,26 @@ class FrontViewer(SensorModel):
         obj_positions = np.concatenate([obj.position for obj in self.map.dynamic_objects], axis=-1)
         radius = int(obj.radius / self.map.cell_size)
         circle_opts = dict(color=(1, 1, 1), thickness=-1, radius=radius)
+        vpos = self.vehicle_position
 
         for i, (cx, cy, angle, s) in enumerate(zip(cxs, cys, angles, state.T)):
             # features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
             # features = np.concatenate([self.rewards, W[i]], axis=-1)
-            self.images[i] = rotated_rect(self.rewards, (cx, cy), (fov, fov), angle)[..., None]
+            self.images[i] = rotated_rect(self.rewards, vpos, (cx, cy), (fov, fov), angle)[..., None]
 
             # iterate all dynamic_objects and draw on rotated_and_cropped image
             valids = [
                 ((isinstance(obj.valid, bool) and obj.valid) or obj.valid[i])
                 for obj in self.map.dynamic_objects
             ]
-            ixs, iys = compute_obj_ixiy(obj_positions, s, fov, self.map.cell_size)
+            ixs, iys = compute_obj_ixiy(obj_positions, s, fov, vpos, self.map.cell_size)
 
             for ix, iy, valid in zip(ixs, iys, valids):
                 if valid:
-                    # self.images[i, iy, ix] = 1
                     cv2.circle(self.images[i], (ix, iy), **circle_opts)
+
+            # Draw the vehicle itself as a dot
+            # self.images[i, vpos[1], vpos[0]] = 1
 
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
         c_lidar_mask(self.images, self.pass_through_thres, random_seed)
@@ -238,7 +250,6 @@ class FrontViewer(SensorModel):
         angles = theta * RAD2DEG
 
         return cxs, cys, angles
-
 
 class Lidar(SensorModel):
     def __init__(self):

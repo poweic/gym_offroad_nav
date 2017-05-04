@@ -40,6 +40,7 @@ class OffRoadNavEnv(gym.Env):
         'wheelbase': 2.0,
         'map_def': 'map9',
         'command_freq': 5,
+        'vehicle_position': 'bottom', # can be either at center, or bottom
         'n_agents_per_worker': 1,
         'viewport_scale': 3,
         'discount_factor': 0.99,
@@ -76,7 +77,9 @@ class OffRoadNavEnv(gym.Env):
         # the simplest front view sensor
         self.sensors = {
             'vehicle_state': Odometry(self.opts.odom_noise_level),
-            'front_view': FrontViewer(self.map, self.opts.field_of_view)
+            'front_view': FrontViewer(
+                self.map, self.opts.field_of_view, self.opts.vehicle_position
+            )
         }
 
         """

@@ -7,3 +7,4 @@ Pillow==4.1.0
 cv2==1.0
 gym==0.8.1
 PyYAML==3.12
+lifelines==0.9.4

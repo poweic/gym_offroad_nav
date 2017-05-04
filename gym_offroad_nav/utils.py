@@ -44,7 +44,7 @@ def get_options_from_TF_flags(keys):
     return options
 
 class Timer(object):
-    def __init__(self, message, maxlen=1000):
+    def __init__(self, message, maxlen=10000):
         self.timer = deque(maxlen=maxlen)
         self.counter = 0
         self.message = message

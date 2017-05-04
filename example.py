@@ -50,13 +50,19 @@ def callback(controls):
 
     # collect the reward
     total_return += reward
-    print "total_return = {} [done = {}]".format(total_return, done)
+    # print "total_return = {} [done = {}]".format(total_return, done)
+
+    if done:
+        env.reset()
+        total_return = 0
 
     # refresh OpenGL renderer
     env.render()
 
+'''
 joystick = JoystickController(callback)
 joystick.start()
+'''
 
 for i in range(1000):
     env.reset()

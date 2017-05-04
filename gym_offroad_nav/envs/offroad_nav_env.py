@@ -17,6 +17,8 @@ from gym_offroad_nav.viewer import Viewer
 # from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
 # from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
+import matplotlib.pyplot as plt
+from lifelines import KaplanMeierFitter
 from collections import deque
 
 DEG2RAD = np.pi / 180.
@@ -41,6 +43,7 @@ class OffRoadNavEnv(gym.Env):
         'map_def': 'map9',
         'command_freq': 5,
         'vehicle_position': 'bottom', # can be either at center, or bottom
+        'KMF_window': 100,
         'n_agents_per_worker': 1,
         'viewport_scale': 3,
         'discount_factor': 0.99,
@@ -128,13 +131,19 @@ class OffRoadNavEnv(gym.Env):
 
         self.rng = np.random.RandomState()
 
-        self.initialized = True
+        self.kmf = KaplanMeierFitter()
+        self.last_N_distances_traveled = deque(maxlen=self.opts.KMF_window)
+        self.last_N_crashed = deque(maxlen=self.opts.KMF_window)
+
+        self.total_episodes = 0
 
         self.timer = AttrDict(
             vehicle_model=Timer("vehicle_model"),
             get_obs=Timer("get_obs"),
             others=Timer("contains + reward")
         )
+
+        self.initialized = True
 
     def fit(self):
         waypoints = self.map.waypoints[2::2, None, :]
@@ -212,6 +221,13 @@ class OffRoadNavEnv(gym.Env):
         crash_penalty = crashed * self.map.crash_penalty
         impact_penalty = vel * impact * self.map.impact_penalty
 
+        # collect statistics when episode ends (i.e. any of the vehicle crashed)
+        if np.any(crashed):
+            self.total_episodes += 1
+            self.last_N_distances_traveled.append(self.distances_traveled)
+            self.last_N_crashed.append(crashed)
+            self.kmf_summarize()
+
         info = AttrDict()
 
         # compute reward based on new_state
@@ -275,6 +291,15 @@ class OffRoadNavEnv(gym.Env):
             for i in range(self.opts.n_agents_per_worker)
         ]
 
+    def kmf_summarize(self):
+        distances = np.array(self.last_N_distances_traveled)
+        event_observed = np.array(self.last_N_crashed)
+        self.kmf.fit(distances.reshape(-1), event_observed=event_observed.reshape(-1))
+
+        if self.total_episodes % self.opts.KMF_window == 0:
+            print "\33[92mKMF's MDTF = {}, naive MDTF = {}\33[0m".format(
+                self.kmf.median_, np.mean(np.sum(distances, axis=-1)))
+
     def _reset(self):
         self.map.reset()
         s0 = self.get_initial_state()
@@ -282,6 +307,7 @@ class OffRoadNavEnv(gym.Env):
         # self.vehicle_model_gpu.reset(s0)
 
         self.distances_traveled = 0
+        self.crashes = 0
 
         self.state[:] = s0[:]
         for vehicle in self.vehicles:
@@ -292,11 +318,6 @@ class OffRoadNavEnv(gym.Env):
 
         self.viewer.clear()
         self.add_objects_to_viewer()
-
-        """
-        for obj in self.map.dynamic_objects:
-            obj.reset()
-        """
 
         return self._get_obs()
 

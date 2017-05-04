@@ -3,7 +3,6 @@ import abc
 import math
 import numpy as np
 import time
-from numba import jit
 from gym_offroad_nav.utils import to_image, Timer
 from gym_offroad_nav.lidar.lidar import c_lidar_mask
 from gym import spaces

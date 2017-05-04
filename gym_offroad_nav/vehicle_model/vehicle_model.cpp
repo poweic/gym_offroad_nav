@@ -69,7 +69,8 @@ void step(
     uint32_t random_seed,
     float* rewards, const float* const reward_map, uint32_t height, uint32_t width,
     int32_t x_min, int32_t x_max, int32_t y_min, int32_t y_max, float cell_size,
-    float low_speed_penalty, float decay_rate, float high_acc_penalty) {
+    float low_speed_penalty, float decay_rate, float high_acc_penalty,
+    float* distances) {
 
   // penalty and decay rate might be ambiguous: is it positive or negative?
   // make sure they're always positive
@@ -84,24 +85,24 @@ void step(
   // syntax sugar
   uint32_t& b = batch_size;
 
-  for (uint32_t j=0; j<b; ++j) {
+  for (uint32_t i=0; i<b; ++i) {
     double prev_vx, prev_vy;
 
-    for (uint32_t i=0; i<n_sub_steps; ++i) {
-      double& s0 = s[j + 0*b];
-      double& s1 = s[j + 1*b];
-      double& s2 = s[j + 2*b];
-      double& s3 = s[j + 3*b];
-      double& s4 = s[j + 4*b];
-      double& s5 = s[j + 5*b];
+    for (uint32_t j=0; j<n_sub_steps; ++j) {
+      double& s0 = s[i + 0*b];
+      double& s1 = s[i + 1*b];
+      double& s2 = s[i + 2*b];
+      double& s3 = s[i + 3*b];
+      double& s4 = s[i + 4*b];
+      double& s5 = s[i + 5*b];
 
-      double& x0 = x[j + 0*b];
-      double& x1 = x[j + 1*b];
-      double& x2 = x[j + 2*b];
-      double& x3 = x[j + 3*b];
+      double& x0 = x[i + 0*b];
+      double& x1 = x[i + 1*b];
+      double& x2 = x[i + 2*b];
+      double& x3 = x[i + 3*b];
 
-      const double& u0 = u[j + 0*b];  // forward velocity command
-      const double& u1 = u[j + 1*b];  // steering angle command
+      const double& u0 = u[i + 0*b];  // forward velocity command
+      const double& u1 = u[i + 1*b];  // steering angle command
       double u_yawrate = STEER_TO_YAWRATE(s4, u1, wheelbase);
 
       // printf("x = [%f, %f, %f, %f]\n", x0, x1, x2, x3);
@@ -138,23 +139,24 @@ void step(
 
       // compute the displacement (ds = sqrt(dx^2 + dy^2)) along the path, the
       // longer the distance travel on "smooth trail", the higher the reward.
-      float displacement = VEC_NORM(dx, dy);
+      float ds = VEC_NORM(dx, dy);
       float r = bilinear_reward_lookup(s0 + dx / 2, s1 + dy / 2,
 	  reward_map, height, width, x_min, x_max, y_min, y_max, cell_size);
 
-      rewards[j] += displacement * r;
+      rewards[i] += ds * r;
+      distances[i] += ds;
 
       float v = VEC_NORM(vx, vy);
-      rewards[j] -= low_speed_penalty * exp(-decay_rate * v);
+      rewards[i] -= low_speed_penalty * exp(-decay_rate * v);
 
-      // Skip i == 0, penalize large acceleration
+      // Skip j == 0, penalize large acceleration
       // Formula: a = dv / dt
-      if (i > 0) {
+      if (j > 0) {
 	float dvx = vx - prev_vx;
 	float dvy = vy - prev_vy;
 	float dv = VEC_NORM(dvx, dvy);
 	float acc = dv / dt;
-	rewards[j] -= high_acc_penalty * acc;
+	rewards[i] -= high_acc_penalty * acc;
       }
 
       s0 += dx;

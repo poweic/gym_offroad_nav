@@ -64,7 +64,7 @@ class VehicleModel():
 
         # c_step implicitly ASSUME x, state, action, noise are contiguous array
         # with row-major memory layout (i.e. order='C')
-        rewards = c_step(
+        rewards, distances_traveled = c_step(
             self.x, state, action, n_sub_steps,
             self.timestep, self.noise_level, self.wheelbase, float(self.drift),
             random_seed,
@@ -74,7 +74,7 @@ class VehicleModel():
             high_acc_penalty=map.high_acc_penalty
         )
 
-        return state, rewards.reshape(-1)
+        return state, rewards.reshape(-1), distances_traveled.reshape(-1)
 
     def predict_old(self, state, action):
         if self.x is None:

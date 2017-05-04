@@ -187,9 +187,10 @@ class OffRoadNavEnv(gym.Env):
         new_state = self.state.copy()
         # new_state_gpu = self.state.copy()
 
-        new_state, rewards = self.vehicle_model.predict(
+        new_state, rewards, distances_traveled = self.vehicle_model.predict(
             new_state, action, self.n_sub_steps, self.map
         )
+        self.distances_traveled += distances_traveled
         self.timer.vehicle_model.toc()
 
         """
@@ -279,6 +280,8 @@ class OffRoadNavEnv(gym.Env):
         s0 = self.get_initial_state()
         self.vehicle_model.reset(s0)
         # self.vehicle_model_gpu.reset(s0)
+
+        self.distances_traveled = 0
 
         self.state[:] = s0[:]
         for vehicle in self.vehicles:

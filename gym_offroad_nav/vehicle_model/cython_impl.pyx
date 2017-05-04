@@ -21,7 +21,8 @@ cdef extern from "vehicle_model.cpp":
         int32_t x_min, int32_t x_max,
         int32_t y_min, int32_t y_max,
         float cell_size,
-        float low_speed_penalty, float decay_rate, float high_acc_penalty
+        float low_speed_penalty, float decay_rate, float high_acc_penalty,
+        float* distances
     )
 
 @cython.boundscheck(False)
@@ -43,8 +44,9 @@ def c_step(np.ndarray[np.float64_t, ndim=2] x,
     cdef np.uint32_t height = reward_map.shape[0]
     cdef np.uint32_t width = reward_map.shape[1]
 
-    # allocate contiguous C-order rewards
+    # allocate contiguous C-order rewards & total distance traveled (sum of ds)
     cdef np.ndarray rewards = np.zeros((1, batch_size), dtype=np.float32, order='C')
+    cdef np.ndarray distances = np.zeros((1, batch_size), dtype=np.float32, order='C')
 
     step(
         <double*>x.data,
@@ -55,7 +57,8 @@ def c_step(np.ndarray[np.float64_t, ndim=2] x,
         random_seed,
         <float*> rewards.data, <float*> reward_map.data, height, width,
         bounds["x_min"], bounds["x_max"], bounds["y_min"], bounds["y_max"], cell_size,
-        low_speed_penalty, decay_rate, high_acc_penalty
+        low_speed_penalty, decay_rate, high_acc_penalty,
+        <float*>distances.data
     )
 
-    return rewards
+    return rewards, distances

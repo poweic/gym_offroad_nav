@@ -17,7 +17,6 @@ from gym_offroad_nav.viewer import Viewer
 # from gym_offroad_nav.vehicle_model.tf_impl import VehicleModelGPU
 # from gym_offroad_nav.trajectory_following import TrajectoryFitter
 
-import matplotlib.pyplot as plt
 from lifelines import KaplanMeierFitter
 from collections import deque
 

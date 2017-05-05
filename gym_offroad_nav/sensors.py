@@ -5,7 +5,12 @@ import numpy as np
 import time
 from gym_offroad_nav.utils import to_image, Timer
 from gym_offroad_nav.lidar.lidar import c_lidar_mask
+from gym_offroad_nav.snapshot import memory_snapshot_decorate
 from gym import spaces
+
+# @memory_snapshot_decorate("tests/test_lidar/test_case_1.pkl")
+def lidar_mask(images, threshold, random_seed):
+    return c_lidar_mask(images, threshold, random_seed)
 
 RAD2DEG = 180. / np.pi
 FLOAT_MIN = np.finfo(np.float32).min
@@ -159,7 +164,7 @@ class FrontViewer(SensorModel):
 
         self.timer.tic()
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
-        c_lidar_mask(self.images, self.pass_through_thres, random_seed)
+        lidar_mask(self.images, self.pass_through_thres, random_seed)
         self.timer.toc()
 
         return self.images

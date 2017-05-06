@@ -1,9 +1,10 @@
 import cv2
 import abc
 import math
-import numpy as np
 import time
-from gym_offroad_nav.utils import to_image, Timer
+import scipy.io
+import numpy as np
+from gym_offroad_nav.utils import to_image, Timer, dirname
 from gym_offroad_nav.lidar.lidar import c_lidar_mask
 from gym_offroad_nav.snapshot import memory_snapshot_decorate
 from gym import spaces
@@ -95,6 +96,8 @@ class FrontViewer(SensorModel):
         self.field_of_view = field_of_view
         self.noise_level = noise_level
 
+        self.masks = self.init_dropout_mask()
+
         fov = field_of_view
         if vehicle_position is "center":
             self.vehicle_position = (fov/2, fov - 1 - fov/2)
@@ -123,6 +126,26 @@ class FrontViewer(SensorModel):
         self.timer = Timer("raycasting")
         self.counter = 0
 
+    def init_dropout_mask(self):
+
+        current_dir = dirname(__file__)
+        masks = scipy.io.loadmat(current_dir + "/masks.mat")['masks']
+
+        N, H, W = masks.shape
+
+        fov = self.field_of_view
+
+        if fov != H:
+            size = (fov, fov)
+            masks = np.vstack([
+                cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST)[None]
+                for mask in masks
+            ])
+
+        masks = (masks == 0)
+
+        return masks
+
     def eval(self, state):
         
         cxs, cys, angles = self._get_cx_cy_angle(state)
@@ -143,11 +166,27 @@ class FrontViewer(SensorModel):
         circle_opts = dict(color=(1, 1, 1), thickness=-1, radius=radius)
         vpos = self.vehicle_position
 
-        for i, (cx, cy, angle, s) in enumerate(zip(cxs, cys, angles, state.T)):
+        cxy_angles = zip(cxs, cys, angles, state.T)
+
+        for i, (cx, cy, angle, s) in enumerate(cxy_angles):
             # features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
             # features = np.concatenate([self.rewards, W[i]], axis=-1)
             self.images[i] = rotated_rect(self.rewards, vpos, (cx, cy), (fov, fov), angle)[..., None]
 
+            # Draw the vehicle itself as a dot
+            # self.images[i, vpos[1], vpos[0]] = 1
+
+        self.timer.tic()
+        random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
+        lidar_mask(self.images, self.pass_through_thres, random_seed)
+
+        n_masks = len(self.masks)
+        for img in self.images:
+            idx = self.rng.randint(low=0, high=n_masks)
+            mask = self.masks[idx]
+            img[mask] = -1
+
+        for i, (cx, cy, angle, s) in enumerate(cxy_angles):
             # iterate all dynamic_objects and draw on rotated_and_cropped image
             valids = [
                 ((isinstance(obj.valid, bool) and obj.valid) or obj.valid[i])
@@ -159,12 +198,6 @@ class FrontViewer(SensorModel):
                 if valid:
                     cv2.circle(self.images[i], (ix, iy), **circle_opts)
 
-            # Draw the vehicle itself as a dot
-            # self.images[i, vpos[1], vpos[0]] = 1
-
-        self.timer.tic()
-        random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
-        lidar_mask(self.images, self.pass_through_thres, random_seed)
         self.timer.toc()
 
         return self.images

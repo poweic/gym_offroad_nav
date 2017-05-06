@@ -51,7 +51,8 @@ class Odometry(SensorModel):
     def eval(self, state):
         # Add some noise using state * (1 + noise) instead of state + noise
         noise = self.rng.rand(*state.shape) * self.noise_level
-        return (state * (1 + noise)).T
+        measurement = (state * (1 + noise)).T
+        return measurement.astype(np.float32)
 
     def render(self):
         # should render the trace of vehicle here
@@ -67,7 +68,8 @@ def rotated_rect(img, pivot, center, size, angle, scale=1):
     M[:, 2] += (cx - pivot[0], cy - pivot[1])
 
     warped = cv2.warpAffine(
-        img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_LINEAR,
+        # img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_LINEAR,
+        img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_NEAREST,
         borderMode=cv2.BORDER_REPLICATE
     )
 
@@ -84,6 +86,14 @@ def compute_obj_ixiy(obj_positions, state, fov, pivot, cell_size):
     ixs, iys = ixs + pivot[0], -iys + pivot[1]
 
     return ixs, iys
+
+# convert [-1, 1] to [0, 255]
+def rescale2uint8(x):
+    x = (x + 1.) / 2. * 255.
+    if isinstance(x, np.ndarray):
+        return x.astype(np.uint8)
+    else:
+        return int(x)
 
 # This sensor model return the front view of the vehicle as an image of shape
 # fov x fov, where fov is the field of view (how far you see).
@@ -106,7 +116,7 @@ class FrontViewer(SensorModel):
             raise ValueError("vehicle position must be either center or bottom")
 
         #
-        self.rewards, self.reward_min, self.reward_max = self.init_reward_map()
+        self.rewards = self.init_reward_map()
 
         self.images = None
 
@@ -114,20 +124,22 @@ class FrontViewer(SensorModel):
         # porosity. Ex: bushes has a porosity of 0.4, so we store -0.4. We use
         # the minimum porosity * 0.95 as the threshold (take np.max because
         # they are all negative).
-        self.pass_through_thres = np.max(
+        self.pass_through_thres = rescale2uint8(np.max(
             self.map.class_id_to_rewards[~self.map.traversable]
-        ) * 0.95
+        ) * 0.95)
 
         self.timer = Timer("raycasting")
         self.counter = 0
 
     def init_reward_map(self):
-        reward_min = -1
-        reward_max = +1
         rewards = self.map.rewards[..., None]
-        assert reward_min <= np.min(rewards) and np.max(rewards) <= reward_max
 
-        return rewards, reward_min, reward_max
+        # Make sure all rewards are within the range [-1, +1]
+        assert -1 <= np.min(rewards) and np.max(rewards) <= 1
+
+        rewards = rescale2uint8(rewards)
+
+        return rewards
 
     def init_dropout_mask(self):
 
@@ -160,11 +172,9 @@ class FrontViewer(SensorModel):
 
         n_channels = self.num_features()
         if self.images is None:
-            self.images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32, order='C')
+            self.images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.uint8, order='C')
 
         obj_positions = np.concatenate([obj.position for obj in self.map.dynamic_objects], axis=-1)
-        radius = int(obj.radius / self.map.cell_size)
-        circle_opts = dict(color=(1, 1, 1), thickness=-1, radius=radius)
         vpos = self.vehicle_position
 
         cxy_angles = zip(cxs, cys, angles, state.T)
@@ -183,8 +193,10 @@ class FrontViewer(SensorModel):
         for img in self.images:
             idx = self.rng.randint(low=0, high=n_masks)
             mask = self.masks[idx]
-            img[mask] = -1
+            img[mask] = 0
 
+        radius = int(obj.radius / self.map.cell_size)
+        circle_opts = dict(color=(255, 255, 255), thickness=-1, radius=radius)
         for i, (cx, cy, angle, s) in enumerate(cxy_angles):
             # iterate all dynamic_objects and draw on rotated_and_cropped image
             valids = [
@@ -217,14 +229,10 @@ class FrontViewer(SensorModel):
         if self.images is None:
             return
 
-        def normalize(x, min_, max_):
-            return (x - min_) / (max_ - min_)
-
         # visualization (for debugging purpose)
-        normalized = normalize(self.images, self.reward_min, self.reward_max)
-        disp_img = np.concatenate([img for img in normalized], axis=1)
+        disp_img = np.concatenate([img for img in self.images], axis=1)
 
-        disp_img = rescale_image(disp_img, 4)
+        # disp_img = rescale_image(disp_img, 4)
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
 

@@ -8,7 +8,7 @@
 
 #define GET_VALUE(i, j) (image[(i)*height+(j)])
 // threshold
-float gThreshold;
+uint8_t gThreshold;
 
 // Provide the compiler with branch prediction information, which may gain huge
 // speed-up when you're pretty sure a conditional statement is almost always
@@ -45,7 +45,7 @@ inline T min_(T x, T y) { return (x < y) ? x : y; }
 
 template <int axis>
 inline void __attribute__((always_inline)) trace_along_axis(
-    float* const &image,
+    uint8_t* const &image,
     const int32_t &m0, const int32_t &m1, const int32_t &g1p,
     int32_t &x,  int32_t &y,
     int32_t &dx, int32_t &dy) {
@@ -72,19 +72,21 @@ inline void __attribute__((always_inline)) trace_along_axis(
       unsigned int yy = y & m1;
       unsigned int idx = (xx << g1p) + yy;
 
-      float& value = image[idx];
+      uint8_t& value = image[idx];
 
       // Only obstacles, bushes, and trees has value < 0
       if (value < gThreshold) {
 	// stop_prob is the absolute value, but since gThreshold < 0, value
 	// is always smaller than 0
-	float stop_prob = -value;
-	if (float(rand()) / RAND_MAX < stop_prob)
+	uint8_t stop_prob = 128 - value;
+	uint8_t sample = rand() & 0x77;
+
+	if (sample < stop_prob)
 	  collided = true;
       }
 
       if (collided)
-	value = -1;
+	value = 0;
 
       if (axis == 0) x += sx; else trace_one_step(x, a);
       if (axis == 1) y += sy; else trace_one_step(y, a);
@@ -96,7 +98,7 @@ inline void __attribute__((always_inline)) trace_along_axis(
 void bresenham_trace(
     int32_t x1, int32_t y1,
     int32_t x2, int32_t y2,
-    float* image, const uint32_t g0, const uint32_t g1) {
+    uint8_t* image, const uint32_t g0, const uint32_t g1) {
 
     int32_t dx = x2 - x1;
     int32_t dy = y2 - y1;
@@ -113,7 +115,7 @@ void bresenham_trace(
       trace_along_axis<1>(image, m0, m1, g1p, x1, y1, dx, dy);
 }
 
-void mask_single_image(float* image, uint32_t height, uint32_t width) {
+void mask_single_image(uint8_t* image, uint32_t height, uint32_t width) {
 
   for (uint32_t j=0; j<height; ++j) {
     // Left boundary
@@ -132,8 +134,8 @@ void mask_single_image(float* image, uint32_t height, uint32_t width) {
     bresenham_trace(height - 2, width/2    , 0, i, image, width, height);
 }
 
-void mask(float* images, uint32_t batch_size, uint32_t height, uint32_t width,
-    float threshold, uint32_t random_seed) {
+void mask(uint8_t* images, uint32_t batch_size, uint32_t height, uint32_t width,
+    uint8_t threshold, uint32_t random_seed) {
 
   // If seed is set to 1, the generator is reinitialized to its initial value
   // and produces the same values as before any call to rand or srand.
@@ -142,8 +144,7 @@ void mask(float* images, uint32_t batch_size, uint32_t height, uint32_t width,
   srand(random_seed);
   gThreshold = threshold;
 
-  for (uint32_t k=0; k<batch_size; ++k) {
-    float* image = images + k*width*height;
-    mask_single_image(image, height, width);
-  }
+  uint32_t step = width*height;
+  for (uint32_t k=0; k<batch_size; ++k)
+    mask_single_image(images + k*step, height, width);
 }

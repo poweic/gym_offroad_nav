@@ -46,7 +46,7 @@ class OffRoadNavEnv(gym.Env):
         'n_agents_per_worker': 1,
         'viewport_scale': 3,
         'discount_factor': 0.99,
-        'max_steps': 100,
+        'max_steps': 10000,
         'drift': False
     }
 
@@ -173,7 +173,7 @@ class OffRoadNavEnv(gym.Env):
 
     def _get_obs(self):
         return AttrDict({
-            k: sensor.eval(self.state).astype(np.float32) for k, sensor in self.sensors.iteritems()
+            k: sensor.eval(self.state).copy() for k, sensor in self.sensors.iteritems()
         })
 
     def _step(self, action):

@@ -4,7 +4,7 @@ import math
 import time
 import scipy.io
 import numpy as np
-from gym_offroad_nav.utils import to_image, Timer, dirname
+from gym_offroad_nav.utils import to_image, Timer, dirname, rescale_image
 from gym_offroad_nav.lidar.lidar import c_lidar_mask
 from gym_offroad_nav.snapshot import memory_snapshot_decorate
 from gym import spaces
@@ -106,7 +106,7 @@ class FrontViewer(SensorModel):
             raise ValueError("vehicle position must be either center or bottom")
 
         #
-        self.rewards = self.map.rewards[..., None].astype(np.float32)
+        self.rewards, self.reward_min, self.reward_max = self.init_reward_map()
 
         self.images = None
 
@@ -120,6 +120,14 @@ class FrontViewer(SensorModel):
 
         self.timer = Timer("raycasting")
         self.counter = 0
+
+    def init_reward_map(self):
+        reward_min = -1
+        reward_max = +1
+        rewards = self.map.rewards[..., None]
+        assert reward_min <= np.min(rewards) and np.max(rewards) <= reward_max
+
+        return rewards, reward_min, reward_max
 
     def init_dropout_mask(self):
 
@@ -209,22 +217,14 @@ class FrontViewer(SensorModel):
         if self.images is None:
             return
 
-        n_agents, h, w = self.images.shape[:3]
-
-        reward_min = -1
-        reward_max = +1
-
-        def unnormalize(x):
-            x = (x - reward_min) / (reward_max - reward_min)
-            return x
+        def normalize(x, min_, max_):
+            return (x - min_) / (max_ - min_)
 
         # visualization (for debugging purpose)
-        disp_img = np.zeros((h, n_agents*w, 3), dtype=np.float32)
-        for i, img in enumerate(self.images):
-            s = slice(i*w, (i+1)*w)
-            disp_img[0*h:1*h, s] += unnormalize(img[..., 0:1])
+        normalized = normalize(self.images, self.reward_min, self.reward_max)
+        disp_img = np.concatenate([img for img in normalized], axis=1)
 
-        # disp_img = cv2.resize(disp_img, (disp_img.shape[1]*4, disp_img.shape[0]*4), interpolation=cv2.INTER_NEAREST)
+        disp_img = rescale_image(disp_img, 4)
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
 

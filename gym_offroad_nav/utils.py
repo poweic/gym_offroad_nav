@@ -20,6 +20,10 @@ def get_speed(state):
 def get_position(state):
     return np.sqrt(state[0] ** 2 + state[1] ** 2)
 
+def rescale_image(x, scale, interpolation=cv2.INTER_LINEAR):
+    new_size = (x.shape[1] * scale, x.shape[0] * scale)
+    return cv2.resize(x, new_size, interpolation=interpolation)
+
 def normalize(x):
     value_range = np.max(x) - np.min(x)
     if value_range != 0:

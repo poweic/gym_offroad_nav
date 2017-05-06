@@ -73,7 +73,6 @@ def rotated_rect(img, pivot, center, size, angle, scale=1):
 
     return warped
 
-# @jit
 def compute_obj_ixiy(obj_positions, state, fov, pivot, cell_size):
     theta = state[2]
     cos, sin = math.cos(theta), math.sin(theta)
@@ -106,12 +105,8 @@ class FrontViewer(SensorModel):
         else:
             raise ValueError("vehicle position must be either center or bottom")
 
-        # centralize the reward map, and rgb_map
-        rewards = self.map.rewards[..., None].astype(np.float32)
-        # self.reward_mean, self.reward_std = np.mean(rewards), np.std(rewards)
-        # self.rewards = (rewards - self.reward_mean) / self.reward_std
-        self.rewards = rewards
-        self.rgb_map = self.map.rgb_map.astype(np.float32) / 127.5 - 1
+        #
+        self.rewards = self.map.rewards[..., None].astype(np.float32)
 
         self.images = None
 
@@ -159,8 +154,6 @@ class FrontViewer(SensorModel):
         if self.images is None:
             self.images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.float32, order='C')
 
-        # W = self.get_waypoint_map(n_agents)
-
         obj_positions = np.concatenate([obj.position for obj in self.map.dynamic_objects], axis=-1)
         radius = int(obj.radius / self.map.cell_size)
         circle_opts = dict(color=(1, 1, 1), thickness=-1, radius=radius)
@@ -169,8 +162,6 @@ class FrontViewer(SensorModel):
         cxy_angles = zip(cxs, cys, angles, state.T)
 
         for i, (cx, cy, angle, s) in enumerate(cxy_angles):
-            # features = np.concatenate([self.rewards, self.rgb_map, W[i]], axis=-1)
-            # features = np.concatenate([self.rewards, W[i]], axis=-1)
             self.images[i] = rotated_rect(self.rewards, vpos, (cx, cy), (fov, fov), angle)[..., None]
 
             # Draw the vehicle itself as a dot
@@ -202,20 +193,6 @@ class FrontViewer(SensorModel):
 
         return self.images
 
-    def resize(self, images):
-        n_agents, fov, fov, n_channels = images.shape
-        out_shape = self.get_output_shape()[:2]
-
-        images = images.transpose([1,2,3,0]).reshape(fov, fov, -1)
-
-        images = cv2.resize(images, out_shape, interpolation=cv2.INTER_AREA)
-
-        images = images.reshape(out_shape[0], out_shape[1], n_channels, -1)
-
-        images = images.transpose([3, 0, 1, 2])
-
-        return images
-
     def num_features(self):
         return 1
 
@@ -234,47 +211,22 @@ class FrontViewer(SensorModel):
 
         n_agents, h, w = self.images.shape[:3]
 
-        reward_min = -1 # np.min(self.map.class_id_to_rewards)
-        reward_max = +1 # max(1, np.max(self.map.class_id_to_rewards))
+        reward_min = -1
+        reward_max = +1
 
         def unnormalize(x):
-            # x = x * self.reward_std + self.reward_mean
             x = (x - reward_min) / (reward_max - reward_min)
             return x
 
         # visualization (for debugging purpose)
-        disp_img = np.zeros((1*h, n_agents*w, 3), dtype=np.float32)
+        disp_img = np.zeros((h, n_agents*w, 3), dtype=np.float32)
         for i, img in enumerate(self.images):
             s = slice(i*w, (i+1)*w)
             disp_img[0*h:1*h, s] += unnormalize(img[..., 0:1])
-            # disp_img[1*h:2*h, s]  = (img[..., [3, 2, 1]] + 1) / 2
-            # disp_img[2*h:3*h, s] += img[..., -1:]
 
         # disp_img = cv2.resize(disp_img, (disp_img.shape[1]*4, disp_img.shape[0]*4), interpolation=cv2.INTER_NEAREST)
         cv2.imshow("front_view", disp_img)
         cv2.waitKey(1)
-
-    def get_waypoint_map(self, n_agents):
-
-        m = -np.ones((n_agents,) + self.rewards.shape, dtype=np.float32)
-        bounds = self.map.bounds
-        fov = self.field_of_view
-
-        for i in range(n_agents):
-            for obj in self.map.dynamic_objects:
-                # draw coin the this numpy ndarray, need to convert
-                ix, iy = self.map.get_ixiy(*obj.position)
-                x, y = ix[0] - bounds.x_min, bounds.y_max - 1 - iy[0]
-
-                if (isinstance(obj.valid, bool) and obj.valid) or obj.valid[i]:
-                    color = (1, 1, 1)
-                else:
-                    color = (-1, -1, -1)
-
-                cv2.circle(m[i], (x, y), color=color, thickness=-1,
-                           radius=int(obj.radius / self.map.cell_size))
-
-        return m
 
     def _get_cx_cy_angle(self, state):
         x, y, theta = state[:3]

@@ -1,10 +1,15 @@
 // cython methods to speed-up evaluation
+#include <iostream>
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#include "opencv2/opencv.hpp"
 #define PI 3.14159265359
 #define RAD2DEG (180. / PI)
 #define M2CM 100.
+
+using namespace cv;
+using namespace std;
 
 #define GET_VALUE(i, j) (image[(i)*height+(j)])
 // threshold
@@ -134,8 +139,74 @@ void mask_single_image(uint8_t* image, uint32_t height, uint32_t width) {
     bresenham_trace(height - 2, width/2    , 0, i, image, width, height);
 }
 
-void mask(uint8_t* images, uint32_t batch_size, uint32_t height, uint32_t width,
-    uint8_t threshold, uint32_t random_seed) {
+void rotated_rect(
+    cv::Mat& dst, const cv::Mat& src, Point2f& pivot,
+    const int32_t* const centers, const float& angle, const float& scale) {
+
+  cv::Mat M = cv::getRotationMatrix2D(pivot, angle, scale);
+  M.at<double>(0, 2) += centers[0] - pivot.x;
+  M.at<double>(1, 2) += centers[1] - pivot.y;
+
+  cv::warpAffine(src, dst, M, dst.size(),
+      cv::WARP_INVERSE_MAP + cv::INTER_NEAREST,
+      cv::BORDER_REPLICATE);
+
+  // cout << M << endl;
+}
+
+void draw_objects(
+    cv::Mat& dst,
+    const int32_t& pivot_x, const int32_t& pivot_y, const float& scale,
+    const double* const obj_positions, const uint8_t* const valids, uint32_t n_obj,
+    const double* const state, float cell_size, uint32_t radius) {
+
+  const double& x0 = state[0];
+  const double& y0 = state[1];
+  const double& theta = state[2];
+
+  double c = cos(theta);
+  double s = sin(theta);
+
+  for (uint32_t i=0; i<n_obj; ++i) {
+    const auto obj_pos = obj_positions + i*2;
+    bool valid = valids[i];
+
+    if (not valid)
+      continue;
+
+    // Compute difference
+    double dx_ = obj_pos[0] - x0;
+    double dy_ = obj_pos[1] - y0;
+
+    // Rotate
+    double dx =  c * dx_ + s * dy_;
+    double dy = -s * dx_ + c * dy_;
+
+    // convert to grid index
+    int32_t ix = dx / cell_size;
+    int32_t iy = dy / cell_size;
+
+    ix =  ix + pivot_x;
+    iy = -iy + pivot_y;
+
+    // draw object as a circle
+    cv::circle(dst, Point(ix, iy), radius, Scalar(255, 255, 255), -1);
+  }
+}
+
+void mask(
+    uint8_t* images,
+    uint8_t* reward_map,
+    const int32_t* const centers,
+    const float* const angles,
+    const int32_t& pivot_x, const int32_t& pivot_y, const float& scale,
+    const uint32_t& batch_size, const uint32_t& height, const uint32_t& width,
+    const uint32_t& in_height, const uint32_t& in_width,
+    const double* const obj_positions, const uint8_t* const valids, uint32_t n_obj,
+    const double* const states, float cell_size, uint32_t radius,
+    const uint8_t& threshold, const uint32_t& random_seed) {
+
+  uint32_t step = width*height;
 
   // If seed is set to 1, the generator is reinitialized to its initial value
   // and produces the same values as before any call to rand or srand.
@@ -144,7 +215,23 @@ void mask(uint8_t* images, uint32_t batch_size, uint32_t height, uint32_t width,
   srand(random_seed);
   gThreshold = threshold;
 
-  uint32_t step = width*height;
-  for (uint32_t k=0; k<batch_size; ++k)
-    mask_single_image(images + k*step, height, width);
+  // create src mat (wrapper) from reward_map
+  Point2f pivot(pivot_x, pivot_y);
+  cv::Mat src(in_height, in_width, CV_8UC1, (void*) reward_map);
+
+  for (uint32_t i=0; i<batch_size; ++i) {
+
+    uint8_t* image = images + i*step;
+    cv::Mat dst(height, width, CV_8UC1, (void*) image);
+
+    // rotate
+    rotated_rect(dst, src, pivot, centers + i*2, angles[i], scale);
+
+    // ray-casting
+    mask_single_image(image, height, width);
+
+    // draw objects on image
+    draw_objects(dst, pivot_x, pivot_y, scale,
+	obj_positions, valids + i*n_obj, n_obj, states + i*6, cell_size, radius);
+  }
 }

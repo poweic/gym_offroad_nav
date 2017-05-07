@@ -43,7 +43,7 @@ class OffRoadNavEnv(gym.Env):
         'command_freq': 5,
         'vehicle_position': 'bottom', # can be either at center, or bottom
         'KMF_window': 100,
-        'n_agents_per_worker': 1,
+        'n_agents_per_worker': 32,
         'viewport_scale': 3,
         'discount_factor': 0.99,
         'max_steps': 10000,

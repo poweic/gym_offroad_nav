@@ -25,8 +25,8 @@ state = env.reset()
 for key, obs in state.iteritems():
     print 'state["{}"]: shape = {}, dtype = {}'.format(key, obs.shape, obs.dtype)
 
-np.set_printoptions(linewidth=1000,
-    formatter={'float_kind': lambda x: "{:+7.2f}".format(x).replace('+', ' ')})
+np.set_printoptions(linewidth=10000,
+    formatter={'float_kind': lambda x: "{:+10.5f}".format(x).replace('+', ' ')})
 
 total_return = 0
 

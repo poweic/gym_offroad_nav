@@ -10,8 +10,10 @@ from gym_offroad_nav.snapshot import memory_snapshot_decorate
 from gym import spaces
 
 # @memory_snapshot_decorate("tests/test_lidar/test_case_1.pkl")
+'''
 def lidar_mask(images, threshold, random_seed):
     return c_lidar_mask(images, threshold, random_seed)
+'''
 
 RAD2DEG = 180. / np.pi
 FLOAT_MIN = np.finfo(np.float32).min
@@ -61,32 +63,6 @@ class Odometry(SensorModel):
     def get_obs_space(self):
         return spaces.Box(low=FLOAT_MIN, high=FLOAT_MAX, shape=(6, 1))
 
-def rotated_rect(img, pivot, center, size, angle, scale=1):
-    cx, cy = center
-    width, height = size
-    M = cv2.getRotationMatrix2D(pivot, angle, scale)
-    M[:, 2] += (cx - pivot[0], cy - pivot[1])
-
-    warped = cv2.warpAffine(
-        # img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_LINEAR,
-        img, M, (width, height), flags=cv2.WARP_INVERSE_MAP + cv2.INTER_NEAREST,
-        borderMode=cv2.BORDER_REPLICATE
-    )
-
-    return warped
-
-def compute_obj_ixiy(obj_positions, state, fov, pivot, cell_size):
-    theta = state[2]
-    cos, sin = math.cos(theta), math.sin(theta)
-    M = np.array([[cos, sin], [-sin, cos]])
-
-    dxy = obj_positions - state[:2][..., None]
-    dxy = M.dot(dxy)
-    ixs, iys = (dxy / cell_size).astype(np.int)
-    ixs, iys = ixs + pivot[0], -iys + pivot[1]
-
-    return ixs, iys
-
 # convert [-1, 1] to [0, 255]
 def rescale2uint8(x):
     x = (x + 1.) / 2. * 255.
@@ -128,7 +104,6 @@ class FrontViewer(SensorModel):
             self.map.class_id_to_rewards[~self.map.traversable]
         ) * 0.95)
 
-        self.timer = Timer("raycasting")
         self.counter = 0
 
     def init_reward_map(self):
@@ -174,44 +149,55 @@ class FrontViewer(SensorModel):
         if self.images is None:
             self.images = np.zeros((n_agents, fov, fov, n_channels), dtype=np.uint8, order='C')
 
-        obj_positions = np.concatenate([obj.position for obj in self.map.dynamic_objects], axis=-1)
         vpos = self.vehicle_position
 
-        cxy_angles = zip(cxs, cys, angles, state.T)
+        # =====================================================================
+        scale = 1.
+        centers = np.ascontiguousarray(np.array([cxs, cys], dtype=np.int32).T)
+        angles = angles.astype(np.float32)
+        states = np.ascontiguousarray(state.T)
 
-        for i, (cx, cy, angle, s) in enumerate(cxy_angles):
-            self.images[i] = rotated_rect(self.rewards, vpos, (cx, cy), (fov, fov), angle)[..., None]
+        obj_positions = np.ascontiguousarray(
+            np.concatenate([obj.position for obj in self.map.dynamic_objects], axis=-1).T
+        )
+        valids = self.valids(n_agents)
+        radius = int(obj.radius / self.map.cell_size)
 
-            # Draw the vehicle itself as a dot
-            # self.images[i, vpos[1], vpos[0]] = 1
-
-        self.timer.tic()
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
-        lidar_mask(self.images, self.pass_through_thres, random_seed)
 
+        c_lidar_mask(
+            self.rewards, centers, angles, vpos, scale,
+            self.images, obj_positions, valids, states, self.map.cell_size, radius,
+            self.pass_through_thres, random_seed
+        )
+        # =====================================================================
+
+        '''
         n_masks = len(self.masks)
         for img in self.images:
             idx = self.rng.randint(low=0, high=n_masks)
             mask = self.masks[idx]
             img[mask] = 0
+        '''
 
-        radius = int(obj.radius / self.map.cell_size)
-        circle_opts = dict(color=(255, 255, 255), thickness=-1, radius=radius)
-        for i, (cx, cy, angle, s) in enumerate(cxy_angles):
-            # iterate all dynamic_objects and draw on rotated_and_cropped image
-            valids = [
-                ((isinstance(obj.valid, bool) and obj.valid) or obj.valid[i])
-                for obj in self.map.dynamic_objects
-            ]
-            ixs, iys = compute_obj_ixiy(obj_positions, s, fov, vpos, self.map.cell_size)
-
-            for ix, iy, valid in zip(ixs, iys, valids):
-                if valid:
-                    cv2.circle(self.images[i], (ix, iy), **circle_opts)
-
-        self.timer.toc()
+        '''
+        for i in range(n_agents):
+            # Draw the vehicle itself as a dot
+            self.images[i, vpos[1], vpos[0]] = 1
+        '''
 
         return self.images
+
+    def valids(self, n_agents):
+
+        valids = [[
+            ((isinstance(obj.valid, bool) and obj.valid) or obj.valid[i])
+            for obj in self.map.dynamic_objects
+        ] for i in range(n_agents)]
+
+        valids = np.array(valids, dtype=np.uint8, order='C')
+
+        return valids
 
     def num_features(self):
         return 1

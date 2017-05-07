@@ -29,8 +29,8 @@ ext1 = Extension(
 
 ext2 = Extension(
     "gym_offroad_nav.lidar.lidar", ["gym_offroad_nav/lidar/lidar.pyx"],
-    include_dirs = [numpy.get_include()], #, '/usr/local/include/opencv', '/usr/local/include'],
-    # libraries = ['opencv_core', 'opencv_highgui', 'opencv_imgproc'],
+    include_dirs = [numpy.get_include(), '/usr/local/include/opencv', '/usr/local/include'],
+    libraries = ['opencv_core', 'opencv_highgui', 'opencv_imgproc'],
     extra_compile_args=['-Wno-cpp', '-std=c++11', '-O3'],
     language="c++"
 )

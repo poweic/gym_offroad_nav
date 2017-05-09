@@ -28,7 +28,7 @@ class OffRoadNavEnv(gym.Env):
     }
 
     default_options = {
-        'field_of_view': 64,
+        'field_of_view': 128,
         'min_mu_vf': -14. / 3.6,
         'max_mu_vf': +14. / 3.6,
         'min_mu_steer': -30 * DEG2RAD,
@@ -44,7 +44,7 @@ class OffRoadNavEnv(gym.Env):
         'vehicle_position': 'bottom', # can be either at center, or bottom
         'KMF_window': 100,
         'n_agents_per_worker': 32,
-        'viewport_scale': 3,
+        'viewport_scale': 0.5,
         'discount_factor': 0.99,
         'max_steps': 10000,
         'drift': False

@@ -8,8 +8,6 @@ class Viewer(object):
         self.env = env
         self.viewport_scale = env.opts.viewport_scale
 
-        assert_int(self.viewport_scale, "viewport_scale must be integer, not float")
-
         self.local_frame = ReferenceFrame(
             scale=self.viewport_scale / env.map.cell_size
         )
@@ -41,6 +39,9 @@ class Viewer(object):
         # s is used only for rendering, so it won't affect any underlying
         # simulation. Just like zooming in/out the GUI and that's all.
         w, h, s = self.env.map.width, self.env.map.height, self.viewport_scale
+
+        assert_int(w * s, "width must be integer")
+        assert_int(h * s, "height must be integer")
 
         # Create viewer
         self.viewer = Viewer(width=w, height=h, scale=s)

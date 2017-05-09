@@ -31,17 +31,18 @@ np.set_printoptions(linewidth=10000,
 total_return = 0
 
 def callback(controls):
-    global total_return
+    global total_return, scale
 
     if controls.buttons[0]:
         env.reset()
         total_return = 0
 
-    action_vf    = -(controls.pitch - 512.) / 512. * 6
-    # action_vf    = (controls.throttle- 128.) / 128. * 6
+    action_vf = -(controls.pitch - 512.) / 512. * 6
+    scale = float(controls.throttle) / 256. * 2 + 0.25
+    env.env.sensors['front_view'].scale = scale
 
     # action_steer =  (controls.yaw - 128.) / 128. * (30 / 180. * np.pi)
-    action_steer =  (controls.roll - 512.) / 512. * (30 / 180. * np.pi)
+    action_steer = (controls.roll - 512.) / 512. * (30 / 180. * np.pi)
     # print action_vf, action_steer
     action = np.array([action_vf, action_steer])
 

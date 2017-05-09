@@ -1,0 +1,42 @@
+cell_size: 0.2
+class_id_to_class_name:
+  0: 'void'
+  1: 'smooth trail'
+  2: 'low vegetation (traversable, drive cautiously, despite geometry)'
+  3: 'slow down'
+  4: 'water, puddle, mud (barely traversable, despite geometry)'
+  5: 'obstacles (non traversable)'
+  6: 'bushes (non traversable)'
+  7: 'tree (non traversable)}'
+traversable: [True, True, True, True, True, False, False, False]
+# for classes that are not traversable, rewards has no real meaning for the agent,
+# because the agent can never get those reward. I use that to store the porosity
+class_id_to_rewards: [0.0, 0.5, -0.07, -0.02, -0.05, -0.7, -0.3, -0.5]
+class_id_to_heights: [0.0, 0.05, 0.30, 0.15, 0.00, 1.4, 1.5, 2]
+# class_id_to_rewards: [0.0, 0.01, -0.07, -0.02, -0.05, -0.8, -0.4, -0.6]
+class_id_to_rgb:
+  0: [255, 255, 255]
+  1: [178, 176, 153]
+  2: [128, 255, 0]
+  3: [156, 76, 30]
+  4: [255, 0, 128]
+  5: [1, 88, 255]
+  6: [0, 160, 0]
+  7: [40, 80, 0]
+map_structure_filename: "map9.png"
+trail_skeleton_filename: "map8-skel.png"
+# penalty for crash and impact doesn't have to be [-1, 1]
+crash_penalty: 100.
+impact_penalty: 10.
+# other kinds of penalties should be roughly around [-1, 1]
+low_speed_penalty: 0.01
+low_speed_penalty_decay_rate: 3.
+high_acc_penalty: 0.01
+# waypoints configurations
+waypoint:
+  radius: 1.0
+  reward: 10.0
+  distance_between: 8 # in meters
+  # 5 meters will DIVERGE at  8 minutes mark. (max reward = 5 ) No idea why...
+  # 8 meters will DIVERGE at 14 minutes mark. (max reward = 20) No idea why...
+  goal_reward: 0

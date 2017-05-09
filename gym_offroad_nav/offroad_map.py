@@ -73,7 +73,8 @@ class OffRoadMap(object):
     def reset(self):
         # TODO "reset" is really a bad name, change it plz ...
 
-        self.waypoints, self.initial_pose = self.create_waypoints()
+        ratio = float(self.map_structure.shape[0]) / self.trail_skeleton.shape[0]
+        self.waypoints, self.initial_pose = self.create_waypoints(ratio)
 
         radius = self.waypoint.radius
         reward = self.waypoint.reward
@@ -81,7 +82,7 @@ class OffRoadMap(object):
 
         # downsample the waypoints by 10 so that coins won't be too crowded.
         # Also, skip the first waypoint, since it's the start point
-        step = int(self.waypoint.distance_between / self.cell_size)
+        step = int(self.waypoint.distance_between / self.cell_size / ratio)
         self.dynamic_objects = [
             Coin(
                 map=map, position=waypoint, radius=radius,
@@ -93,10 +94,11 @@ class OffRoadMap(object):
         # return [self.scene] + self.static_objects + self.dynamic_objects
         return self.static_objects + self.dynamic_objects
 
-    def create_waypoints(self):
+    def create_waypoints(self, ratio):
         b = self.bounds
 
         path = self.global_planner.sample_path(self.trail_skeleton, debug=False)
+        path = path * ratio
 
         # b.y_max - 1 - iy, ix - b.x_min
         path[0] += b.x_min

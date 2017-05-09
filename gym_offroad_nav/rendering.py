@@ -27,8 +27,8 @@ def get_display(spec):
 
 class Viewer(object):
     def __init__(self, width, height, display=None, scale=1.0):
-        width *= scale
-        height *= scale
+        width = int(width * scale)
+        height = int(height * scale)
 
         import_pyglet()
         display = get_display(display)

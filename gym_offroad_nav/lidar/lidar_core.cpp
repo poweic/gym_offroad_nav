@@ -190,7 +190,7 @@ void draw_objects(
     iy = -iy + pivot_y;
 
     // draw object as a circle
-    cv::circle(dst, Point(ix, iy), radius, Scalar(255, 255, 255), -1);
+    cv::circle(dst, Point(ix, iy), (int) (radius / scale), Scalar(255, 255, 255), 1);
   }
 }
 

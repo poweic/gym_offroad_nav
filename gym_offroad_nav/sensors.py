@@ -82,6 +82,7 @@ class FrontViewer(SensorModel):
         self.noise_level = noise_level
 
         self.masks = self.init_dropout_mask()
+        self.scale = 1.
 
         fov = field_of_view
         if vehicle_position is "center":
@@ -152,7 +153,6 @@ class FrontViewer(SensorModel):
         vpos = self.vehicle_position
 
         # =====================================================================
-        scale = 1.
         centers = np.ascontiguousarray(np.array([cxs, cys], dtype=np.int32).T)
         angles = angles.astype(np.float32)
         states = np.ascontiguousarray(state.T)
@@ -166,19 +166,17 @@ class FrontViewer(SensorModel):
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
 
         c_lidar_mask(
-            self.rewards, centers, angles, vpos, scale,
+            self.rewards, centers, angles, vpos, self.scale,
             self.images, obj_positions, valids, states, self.map.cell_size, radius,
             self.pass_through_thres, random_seed
         )
         # =====================================================================
 
-        '''
         n_masks = len(self.masks)
         for img in self.images:
             idx = self.rng.randint(low=0, high=n_masks)
             mask = self.masks[idx]
             img[mask] = 0
-        '''
 
         '''
         for i in range(n_agents):

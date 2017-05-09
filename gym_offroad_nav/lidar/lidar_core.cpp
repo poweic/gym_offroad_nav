@@ -175,8 +175,8 @@ void draw_objects(
       continue;
 
     // Compute difference
-    double dx_ = obj_pos[0] - x0;
-    double dy_ = obj_pos[1] - y0;
+    double dx_ = (obj_pos[0] - x0) / scale;
+    double dy_ = (obj_pos[1] - y0) / scale;
 
     // Rotate
     double dx =  c * dx_ + s * dy_;

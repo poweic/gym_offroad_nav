@@ -133,7 +133,7 @@ class FrontViewer(SensorModel):
                 for mask in masks
             ])
 
-        masks = (masks == 0)
+        masks = masks.astype(np.uint8, order='C')
 
         return masks
 
@@ -166,17 +166,11 @@ class FrontViewer(SensorModel):
         random_seed = self.rng.randint(low=2, high=np.iinfo(np.uint32).max)
 
         c_lidar_mask(
-            self.rewards, centers, angles, vpos, self.scale,
+            self.rewards, self.masks, centers, angles, vpos, self.scale,
             self.images, obj_positions, valids, states, self.map.cell_size, radius,
             self.pass_through_thres, random_seed
         )
         # =====================================================================
-
-        n_masks = len(self.masks)
-        for img in self.images:
-            idx = self.rng.randint(low=0, high=n_masks)
-            mask = self.masks[idx]
-            img[mask] = 0
 
         '''
         for i in range(n_agents):

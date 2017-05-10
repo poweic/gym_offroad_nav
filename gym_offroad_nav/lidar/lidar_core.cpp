@@ -120,7 +120,7 @@ void bresenham_trace(
       trace_along_axis<1>(image, m0, m1, g1p, x1, y1, dx, dy);
 }
 
-void mask_single_image(uint8_t* image, uint32_t height, uint32_t width) {
+void ray_trace_2D(uint8_t* image, uint32_t height, uint32_t width) {
 
   for (uint32_t j=0; j<height; ++j) {
     // Left boundary
@@ -137,6 +137,15 @@ void mask_single_image(uint8_t* image, uint32_t height, uint32_t width) {
   // Right part of Top boundary
   for (uint32_t i=width/2; i<width; ++i)
     bresenham_trace(height - 2, width/2    , 0, i, image, width, height);
+}
+
+void add_dropout_mask(uint8_t* image, uint8_t* mask, uint32_t height, uint32_t width) {
+  for (uint32_t i=0; i<height; ++i) {
+    for (uint32_t j=0; j<width; ++j) {
+      if (mask[i*height+j] == 0)
+	image[i*height+j] = 0;
+    }
+  }
 }
 
 void rotated_rect(
@@ -167,6 +176,11 @@ void draw_objects(
   double c = cos(theta);
   double s = sin(theta);
 
+  int32_t height = dst.rows;
+  int32_t width = dst.cols;
+
+  const int_fast8_t cross_size = 3;
+
   for (uint32_t i=0; i<n_obj; ++i) {
     const auto obj_pos = obj_positions + i*2;
     bool valid = valids[i];
@@ -183,19 +197,25 @@ void draw_objects(
     double dy = -s * dx_ + c * dy_;
 
     // convert to grid index
-    int32_t ix = dx / cell_size;
-    int32_t iy = dy / cell_size;
-
-    ix =  ix + pivot_x;
-    iy = -iy + pivot_y;
+    int32_t ix = pivot_x + dx / cell_size;
+    int32_t iy = pivot_y - dy / cell_size;
 
     // draw object as a circle
     cv::circle(dst, Point(ix, iy), (int) (radius / scale), Scalar(255, 255, 255), 1);
+
+    if (ix >= width-cross_size or ix < cross_size or iy >= height-cross_size or iy < cross_size)
+      continue;
+
+    for (int_fast8_t j=-cross_size; j<cross_size; ++j) {
+      dst.data[(iy+j)*height+ix] = 255;
+      dst.data[iy*height+(ix+j)] = 255;
+    }
   }
 }
 
-void mask(
+void simulate_lidar(
     uint8_t* images,
+    uint8_t* masks, uint32_t n_mask,
     uint8_t* reward_map,
     const int32_t* const centers,
     const float* const angles,
@@ -228,7 +248,11 @@ void mask(
     rotated_rect(dst, src, pivot, centers + i*2, angles[i], scale);
 
     // ray-casting
-    mask_single_image(image, height, width);
+    ray_trace_2D(image, height, width);
+
+    // add random dropout mask
+    uint8_t* mask = masks + (rand() % n_mask) * step;
+    add_dropout_mask(image, mask, height, width);
 
     // draw objects on image
     draw_objects(dst, pivot_x, pivot_y, scale,
